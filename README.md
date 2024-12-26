@@ -22,7 +22,7 @@ C:\ConvertTxt2Mp3.exe --voice th-TH-PremwadeeNeural --file hello.txt --output so
 Converting text to speech using voice: th-TH-PremwadeeNeural
 Audio content written to file: som.mp3
 ```
-# 1. Merge jpg files into pdf
+# 2. Merge jpg files into pdf
 ### Usage
 ```
 c:\bin>python merge_jpg_pdf.py jpg
