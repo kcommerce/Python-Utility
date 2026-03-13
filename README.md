@@ -29,3 +29,64 @@ c:\bin>python merge_jpg_pdf.py jpg
 PDF created successfully: jpg\merged_output.pdf
 
 ```
+
+
+
+# 3. Replace domain name in HAR file
+### Usage
+
+## Examples
+ 
+### Single domain
+ 
+```bash
+python har_replacer.py \
+    -i production.har \
+    -o staging.har \
+    -old prod.myapp.com \
+    -new staging.myapp.com
+```
+ 
+### Multiple subdomains via `-replace`
+ 
+```bash
+python har_replacer.py \
+    -i production.har \
+    -o staging.har \
+    -replace api.myapp.com     api-staging.myapp.com \
+    -replace app.myapp.com     app-staging.myapp.com \
+    -replace cdn.myapp.com     cdn-staging.myapp.com \
+    -replace auth.myapp.com    auth-staging.myapp.com
+```
+ 
+### Using a map file
+ 
+```bash
+python har_replacer.py \
+    -i production.har \
+    -o staging.har \
+    --map prod-to-staging.csv
+```
+ 
+### Map file plus extra overrides
+ 
+```bash
+python har_replacer.py \
+    -i production.har \
+    -o staging.har \
+    --map prod-to-staging.csv \
+    -replace payments.thirdparty.com payments.sandbox.com \
+    --verbose
+```
+ 
+### Compact output (no indentation)
+ 
+```bash
+python har_replacer.py \
+    -i capture.har \
+    -o capture-rewritten.har \
+    --map replacements.csv \
+    --indent 0
+```
+ 
+---
