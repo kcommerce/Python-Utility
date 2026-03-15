@@ -88,5 +88,15 @@ python har_replacer.py \
     --map replacements.csv \
     --indent 0
 ```
+
+ # 4. Generate Sequence diagram in HTML from HAR file
+### Usage
+
+## Examples
  
+```bash
+python gen_html2_har.py \
+       network.har \
+ 
+```
 ---
