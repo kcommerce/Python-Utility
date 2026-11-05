@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniEdit - Markdown & HTML Studio</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Marked.js for Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Highlight.js for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" id="hljs-theme">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.7);
+    }
+
+    /* Editor Textarea styling */
+    .editor-textarea {
+      font-family: 'Courier New', Courier, monospace;
+      tab-size: 2;
+      resize: none;
+      white-space: pre;
+    }
+    .editor-textarea.wrap {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Line Numbers Sync */
+    .line-numbers {
+      font-family: 'Courier New', Courier, monospace;
+      user-select: none;
+    }
+
+    /* Dropdown Hover State */
+    .menu-item:hover .menu-dropdown {
+      display: block;
+    }
+
+    /* Markdown Render Styling */
+    .markdown-preview h1 { font-size: 2em; font-weight: bold; margin-bottom: 0.5em; border-bottom: 1px solid rgba(156, 163, 175, 0.3); padding-bottom: 0.2em; }
+    .markdown-preview h2 { font-size: 1.5em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; border-bottom: 1px solid rgba(156, 163, 175, 0.2); padding-bottom: 0.2em; }
+    .markdown-preview h3 { font-size: 1.25em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+    .markdown-preview p { margin-bottom: 1em; line-height: 1.6; }
+    .markdown-preview ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+    .markdown-preview ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+    .markdown-preview blockquote { border-left: 4px solid #0ea5e9; padding-left: 1rem; margin: 1em 0; font-style: italic; opacity: 0.85; }
+    .markdown-preview code:not(pre code) { background: rgba(156, 163, 175, 0.2); padding: 0.2em 0.4em; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+    .markdown-preview pre { margin: 1em 0; border-radius: 6px; overflow-x: auto; }
+    .markdown-preview table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    .markdown-preview th, .markdown-preview td { border: 1px solid rgba(156, 163, 175, 0.3); padding: 8px 12px; text-align: left; }
+    .markdown-preview th { background: rgba(156, 163, 175, 0.1); }
+    .markdown-preview a { color: #0ea5e9; text-decoration: underline; }
+    .markdown-preview img { max-width: 100%; height: auto; border-radius: 6px; margin: 1em 0; }
+    .markdown-preview input[type="checkbox"] { margin-right: 0.5em; }
+
+    /* Custom Toast Animations */
+    @keyframes slideIn {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+    .toast-exit { animation: fadeOut 0.3s ease-in forwards; }
+  </style>
+</head>
+<body class="h-full bg-slate-900 text-slate-100 flex flex-col font-sans antialiased select-none dark">
+
+  <!-- ================= TOP MENU BAR ================= -->
+  <header class="bg-slate-950 border-b border-slate-800 text-xs flex items-center justify-between px-2 h-9 z-30 flex-shrink-0">
+    <!-- Menu Left Items -->
+    <div class="flex items-center space-x-1">
+      <div class="flex items-center px-2 py-1 mr-2 text-brand-500 font-bold text-sm tracking-wide">
+        <i class="fa-solid fa-code mr-1.5"></i> OmniEdit
+      </div>
+
+      <!-- File Menu -->
+      <div class="relative menu-item py-1">
+        <button class="px-2.5 py-1 rounded hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition">File</button>
+        <div class="menu-dropdown hidden absolute left-0 top-full bg-slate-800 border border-slate-700 shadow-xl rounded-md py-1 w-52 z-50 text-slate-200">
+          <button onclick="createNewFile()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-file-circle-plus mr-2 w-4"></i>New File</span>
+            <span class="text-[10px] text-slate-400">Ctrl+N</span>
+          </button>
+          <button onclick="openFile()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-folder-open mr-2 w-4"></i>Open File...</span>
+            <span class="text-[10px] text-slate-400">Ctrl+O</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="saveActiveFile()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-floppy-disk mr-2 w-4"></i>Save</span>
+            <span class="text-[10px] text-slate-400">Ctrl+S</span>
+          </button>
+          <button onclick="saveActiveFileAs()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-box-archive mr-2 w-4"></i>Save As...</span>
+            <span class="text-[10px] text-slate-400">Ctrl+Shift+S</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="exportDocument('pdf')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-file-pdf mr-2 w-4"></i>Print / Export PDF</span>
+            <span class="text-[10px] text-slate-400">Ctrl+P</span>
+          </button>
+          <button onclick="exportDocument('html')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-file-code mr-2 w-4"></i>Export Rendered HTML</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="closeCurrentTab()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center text-red-400">
+            <span><i class="fa-solid fa-xmark mr-2 w-4"></i>Close Tab</span>
+            <span class="text-[10px] text-slate-400">Ctrl+W</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Edit Menu -->
+      <div class="relative menu-item py-1">
+        <button class="px-2.5 py-1 rounded hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition">Edit</button>
+        <div class="menu-dropdown hidden absolute left-0 top-full bg-slate-800 border border-slate-700 shadow-xl rounded-md py-1 w-52 z-50 text-slate-200">
+          <button onclick="execUndo()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-rotate-left mr-2 w-4"></i>Undo</span>
+            <span class="text-[10px] text-slate-400">Ctrl+Z</span>
+          </button>
+          <button onclick="execRedo()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-rotate-right mr-2 w-4"></i>Redo</span>
+            <span class="text-[10px] text-slate-400">Ctrl+Y</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="openFindReplaceModal()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-magnifying-glass mr-2 w-4"></i>Find & Replace</span>
+            <span class="text-[10px] text-slate-400">Ctrl+F</span>
+          </button>
+          <button onclick="selectAllText()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-[#0ea5e9] fa-object-group mr-2 w-4"></i>Select All</span>
+            <span class="text-[10px] text-slate-400">Ctrl+A</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- View Menu -->
+      <div class="relative menu-item py-1">
+        <button class="px-2.5 py-1 rounded hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition">View</button>
+        <div class="menu-dropdown hidden absolute left-0 top-full bg-slate-800 border border-slate-700 shadow-xl rounded-md py-1 w-56 z-50 text-slate-200">
+          <button onclick="setPreviewMode('edit')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-pen-to-square mr-2 w-4"></i>Editor Only</span>
+          </button>
+          <button onclick="setPreviewMode('split')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-columns mr-2 w-4"></i>Split View</span>
+          </button>
+          <button onclick="setPreviewMode('preview')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-eye mr-2 w-4"></i>Preview Only</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="toggleWordWrap()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-wrap-text mr-2 w-4"></i>Toggle Word Wrap</span>
+            <span id="wrap-status" class="text-[10px] text-brand-500 font-bold">ON</span>
+          </button>
+          <button onclick="toggleLineNumbers()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-list-ol mr-2 w-4"></i>Toggle Line Numbers</span>
+            <span id="lines-status" class="text-[10px] text-brand-500 font-bold">ON</span>
+          </button>
+          <button onclick="toggleTheme()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-circle-half-stroke mr-2 w-4"></i>Toggle Dark/Light</span>
+          </button>
+          <hr class="border-slate-700 my-1">
+          <button onclick="toggleFullscreen()" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex justify-between items-center">
+            <span><i class="fa-solid fa-expand mr-2 w-4"></i>Toggle Fullscreen</span>
+            <span class="text-[10px] text-slate-400">F11</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Format / MD Tools Menu -->
+      <div class="relative menu-item py-1">
+        <button class="px-2.5 py-1 rounded hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition">Format</button>
+        <div class="menu-dropdown hidden absolute left-0 top-full bg-slate-800 border border-slate-700 shadow-xl rounded-md py-1 w-52 z-50 text-slate-200">
+          <button onclick="insertFormatting('bold')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-bold mr-2 w-4"></i> Bold (**text**)
+          </button>
+          <button onclick="insertFormatting('italic')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-italic mr-2 w-4"></i> Italic (*text*)
+          </button>
+          <button onclick="insertFormatting('h1')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-heading mr-2 w-4"></i> Heading 1 (#)
+          </button>
+          <button onclick="insertFormatting('h2')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-heading mr-2 w-4"></i> Heading 2 (##)
+          </button>
+          <button onclick="insertFormatting('quote')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-quote-left mr-2 w-4"></i> Blockquote (>)
+          </button>
+          <button onclick="insertFormatting('code')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-code mr-2 w-4"></i> Code Block (```)
+          </button>
+          <button onclick="insertFormatting('link')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-link mr-2 w-4"></i> Insert Link ([])
+          </button>
+          <button onclick="insertFormatting('image')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-image mr-2 w-4"></i> Insert Image (![])
+          </button>
+          <button onclick="insertFormatting('table')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-table mr-2 w-4"></i> Insert Table
+          </button>
+          <button onclick="insertFormatting('checklist')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-list-check mr-2 w-4"></i> Insert Task List
+          </button>
+        </div>
+      </div>
+
+      <!-- Help Menu -->
+      <div class="relative menu-item py-1">
+        <button class="px-2.5 py-1 rounded hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition">Help</button>
+        <div class="menu-dropdown hidden absolute left-0 top-full bg-slate-800 border border-slate-700 shadow-xl rounded-md py-1 w-48 z-50 text-slate-200">
+          <button onclick="openModal('shortcuts-modal')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-keyboard mr-2 w-4"></i> Keyboard Shortcuts
+          </button>
+          <button onclick="openModal('about-modal')" class="w-full text-left px-3 py-1.5 hover:bg-brand-600 hover:text-white flex items-center">
+            <i class="fa-solid fa-circle-info mr-2 w-4"></i> About OmniEdit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Indicator / Mode -->
+    <div class="flex items-center space-x-3 text-slate-400">
+      <span id="active-type-badge" class="px-2 py-0.5 rounded-full text-[10px] uppercase font-bold bg-slate-800 text-brand-400 border border-slate-700">
+        Markdown
+      </span>
+      <button onclick="saveActiveFile()" title="Save Current File" class="hover:text-white transition">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= QUICK TOOLBAR ================= -->
+  <div class="bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between text-xs flex-shrink-0 z-20 overflow-x-auto gap-2">
+    <!-- Format Short Buttons -->
+    <div class="flex items-center space-x-1 flex-shrink-0">
+      <button onclick="insertFormatting('bold')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Bold">
+        <i class="fa-solid fa-bold"></i>
+      </button>
+      <button onclick="insertFormatting('italic')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Italic">
+        <i class="fa-solid fa-italic"></i>
+      </button>
+      <button onclick="insertFormatting('h1')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Heading 1">
+        <i class="fa-solid fa-h1"></i>
+      </button>
+      <button onclick="insertFormatting('h2')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Heading 2">
+        <i class="fa-solid fa-h2"></i>
+      </button>
+      <div class="h-4 w-px bg-slate-700 mx-1"></div>
+      <button onclick="insertFormatting('quote')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Quote">
+        <i class="fa-solid fa-quote-right"></i>
+      </button>
+      <button onclick="insertFormatting('code')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Code Block">
+        <i class="fa-solid fa-code"></i>
+      </button>
+      <button onclick="insertFormatting('link')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Insert Link">
+        <i class="fa-solid fa-link"></i>
+      </button>
+      <button onclick="insertFormatting('image')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Insert Image">
+        <i class="fa-solid fa-image"></i>
+      </button>
+      <button onclick="insertFormatting('table')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Table">
+        <i class="fa-solid fa-table"></i>
+      </button>
+      <button onclick="insertFormatting('checklist')" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition" title="Checklist">
+        <i class="fa-solid fa-list-check"></i>
+      </button>
+    </div>
+
+    <!-- Right Controls (View Toggle & Sync Stats) -->
+    <div class="flex items-center space-x-3 flex-shrink-0">
+      <!-- Layout Mode Buttons -->
+      <div class="bg-slate-800 p-0.5 rounded-lg border border-slate-700 flex items-center space-x-0.5">
+        <button id="btn-mode-edit" onclick="setPreviewMode('edit')" class="px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-pen mr-1"></i>Edit
+        </button>
+        <button id="btn-mode-split" onclick="setPreviewMode('split')" class="px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-columns mr-1"></i>Split
+        </button>
+        <button id="btn-mode-preview" onclick="setPreviewMode('preview')" class="px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-eye mr-1"></i>Preview
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TAB BAR ================= -->
+  <div class="bg-slate-950 border-b border-slate-800 flex items-center px-2 pt-1.5 overflow-x-auto space-x-1 flex-shrink-0" id="tab-container">
+    <!-- Dynamic Tabs Will Be Rendered Here -->
+  </div>
+
+  <!-- ================= MAIN WORKSPACE AREA ================= -->
+  <main class="flex-1 flex overflow-hidden relative bg-slate-900" id="workspace-container">
+    
+    <!-- LEFT: EDITOR CONTAINER -->
+    <div id="editor-pane" class="w-1/2 flex flex-col h-full border-r border-slate-800 relative min-w-[200px]">
+      <div class="flex-1 flex overflow-hidden relative">
+        <!-- Line Numbers Column -->
+        <div id="line-numbers" class="line-numbers py-3 px-2 text-right text-slate-600 bg-slate-950/50 border-r border-slate-800/50 text-xs font-mono select-none overflow-hidden min-w-[40px]">
+          1
+        </div>
+        
+        <!-- Code Textarea -->
+        <textarea id="code-editor" class="editor-textarea flex-1 p-3 bg-transparent text-slate-200 text-xs font-mono focus:outline-none overflow-y-auto leading-relaxed wrap" placeholder="Type or paste markdown/HTML content here..." spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <!-- RESIZE DIVIDER (SPLIT DRAGGER) -->
+    <div id="splitter" class="w-1 bg-slate-800 hover:bg-brand-500 cursor-col-resize transition-colors z-10 flex-shrink-0 hidden md:block"></div>
+
+    <!-- RIGHT: PREVIEW CONTAINER -->
+    <div id="preview-pane" class="w-1/2 flex flex-col h-full bg-slate-900 overflow-hidden relative min-w-[200px]">
+      
+      <!-- Preview Header Toolbar -->
+      <div class="bg-slate-950/40 px-3 py-1.5 border-b border-slate-800/80 flex justify-between items-center text-[11px] text-slate-400">
+        <span class="flex items-center"><i class="fa-solid fa-play mr-1.5 text-emerald-500"></i> Live View</span>
+        <div class="flex items-center space-x-2">
+          <button onclick="refreshPreview()" class="hover:text-white transition" title="Force Refresh Preview">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Markdown / HTML Render Target -->
+      <div class="flex-1 overflow-auto p-6 text-slate-200" id="render-target">
+        <!-- Render content placed dynamically -->
+      </div>
+      
+      <!-- Live HTML Sandboxed Iframe (Hidden by default, used for HTML mode) -->
+      <iframe id="html-iframe" class="w-full h-full border-0 hidden bg-white"></iframe>
+    </div>
+
+  </main>
+
+  <!-- ================= FOOTER / STATUS BAR ================= -->
+  <footer class="bg-slate-950 border-t border-slate-800 h-6 px-3 flex items-center justify-between text-[11px] text-slate-400 flex-shrink-0 z-20">
+    <div class="flex items-center space-x-4">
+      <span id="doc-status" class="flex items-center text-emerald-400">
+        <i class="fa-solid fa-circle text-[7px] mr-1.5"></i> Ready
+      </span>
+      <span id="cursor-pos">Ln 1, Col 1</span>
+    </div>
+    
+    <div class="flex items-center space-x-4">
+      <span id="word-count">0 words</span>
+      <span id="char-count">0 characters</span>
+      <span id="file-encoding" class="hidden sm:inline">UTF-8</span>
+    </div>
+  </footer>
+
+  <!-- Hidden HTML File Input Fallback for legacy support -->
+  <input type="file" id="fallback-file-input" class="hidden" accept=".md,.html,.htm,.txt" onchange="handleFallbackFileOpen(event)">
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- FIND & REPLACE MODAL -->
+  <div id="find-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-magnifying-glass mr-2 text-brand-500"></i>Find & Replace</h3>
+        <button onclick="closeModal('find-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-2">
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Find Text</label>
+          <input type="text" id="find-input" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:border-brand-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">Replace With</label>
+          <input type="text" id="replace-input" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:border-brand-500 focus:outline-none">
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="performReplace(false)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded text-white transition">Replace Next</button>
+        <button onclick="performReplace(true)" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-xs rounded text-white font-medium transition">Replace All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYBOARD SHORTCUTS MODAL -->
+  <div id="shortcuts-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-lg p-5 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-keyboard mr-2 text-brand-500"></i>Keyboard Shortcuts</h3>
+        <button onclick="closeModal('shortcuts-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">New Document</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + N</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Open File</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + O</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Save File</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + S</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Save As</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + Shift + S</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Find & Replace</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + F</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Close Tab</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + W</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Bold Text</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + B</kbd>
+        </div>
+        <div class="flex justify-between bg-slate-950 p-2 rounded border border-slate-800">
+          <span class="text-slate-400">Italic Text</span>
+          <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-brand-400 font-mono">Ctrl + I</kbd>
+        </div>
+      </div>
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal('shortcuts-modal')" class="px-4 py-1.5 bg-brand-600 text-xs rounded text-white hover:bg-brand-500">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT MODAL -->
+  <div id="about-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-md p-5 text-center space-y-3">
+      <div class="inline-flex p-3 bg-brand-500/10 rounded-full text-brand-400 text-3xl mb-1">
+        <i class="fa-solid fa-code"></i>
+      </div>
+      <h3 class="font-bold text-lg text-white">OmniEdit Studio</h3>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        A lightweight, web-based offline code and document editor designed specifically for Markdown (.md) and HTML (.html) files.
+      </p>
+      <div class="bg-slate-950 p-3 rounded text-[11px] text-slate-400 text-left space-y-1">
+        <p><strong class="text-slate-200">Version:</strong> 1.0.0 Standalone</p>
+        <p><strong class="text-slate-200">Features:</strong> Native File System API, Offline Auto-save, Live Markdown & Sandboxed HTML Preview, Custom Exporting.</p>
+      </div>
+      <div class="pt-2">
+        <button onclick="closeModal('about-modal')" class="px-4 py-1.5 bg-brand-600 text-xs rounded text-white hover:bg-brand-500">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-8 right-6 flex flex-col space-y-2 z-50 pointer-events-none"></div>
+
+  <!-- ================= JAVASCRIPT APPLICATION LOGIC ================= -->
+  <script>
+    /* Global Application State */
+    const state = {
+      tabs: [],
+      activeTabId: null,
+      previewMode: 'split', // 'edit', 'split', 'preview'
+      theme: 'dark',
+      wordWrap: true,
+      lineNumbers: true,
+      nextTabId: 1
+    };
+
+    // Default template text for new Markdown tabs
+    const DEFAULT_MARKDOWN = `# Welcome to OmniEdit Studio 🚀
+
+OmniEdit is a **standalone, offline-capable editor** built for standard Markdown and HTML files.
+
+## Key Features
+* 📝 **Split Live View** for real-time Markdown and HTML rendering.
+* 💾 **Native File System API** for direct file save/open.
+* ⚡ **Offline Auto-Save** protection using local storage.
+* 🎨 **Clean & Responsive** desktop-style IDE interface.
+
+### Code Block Example
+\`\`\`javascript
+function calculateTotal(items) {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+console.log("OmniEdit is active!");
+\`\`\`
+
+### Task List
+- [x] Create sleek IDE interface
+- [x] Implement live rendering
+- [ ] Write awesome content!
+
+> *Start typing in the left pane to watch live updates on the right.*
+`;
+
+    // DOM Elements Cache
+    const editor = document.getElementById('code-editor');
+    const lineNumbersEl = document.getElementById('line-numbers');
+    const renderTarget = document.getElementById('render-target');
+    const htmlIframe = document.getElementById('html-iframe');
+    const tabContainer = document.getElementById('tab-container');
+    const editorPane = document.getElementById('editor-pane');
+    const previewPane = document.getElementById('preview-pane');
+    const splitter = document.getElementById('splitter');
+
+    /* Initialize Application */
+    window.addEventListener('DOMContentLoaded', () => {
+      // Configure Marked Options
+      marked.setOptions({
+        gfm: true,
+        breaks: true,
+        highlight: function(code, lang) {
+          if (lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(code, { language: lang }).value;
+          }
+          return hljs.highlightAuto(code).value;
+        }
+      });
+
+      // Load Saved State or Open Initial Tab
+      loadSavedState();
+
+      if (state.tabs.length === 0) {
+        createNewFile('Untitled-1.md', DEFAULT_MARKDOWN);
+      }
+
+      setupEventListeners();
+      setupSplitter();
+      updateEditorView();
+    });
+
+    /* Tab Management Functions */
+    function createNewFile(filename = null, content = '') {
+      const id = 'tab_' + Date.now() + '_' + state.nextTabId++;
+      const isHtml = filename ? filename.endsWith('.html') || filename.endsWith('.htm') : false;
+      const defaultName = filename || `Untitled-${state.tabs.length + 1}.${isHtml ? 'html' : 'md'}`;
+      
+      const newTab = {
+        id,
+        name: defaultName,
+        content: content,
+        fileHandle: null,
+        isDirty: false,
+        type: defaultName.endsWith('.html') || defaultName.endsWith('.htm') ? 'html' : 'md'
+      };
+
+      state.tabs.push(newTab);
+      setActiveTab(id);
+      saveStateToLocalStorage();
+      showToast(`Created new file ${defaultName}`);
+    }
+
+    function setActiveTab(id) {
+      const tab = state.tabs.find(t => t.id === id);
+      if (!tab) return;
+
+      // Save content of active tab before switching
+      if (state.activeTabId) {
+        const currentTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (currentTab) {
+          currentTab.content = editor.value;
+        }
+      }
+
+      state.activeTabId = id;
+      editor.value = tab.content;
+      
+      // Update badge
+      const badge = document.getElementById('active-type-badge');
+      badge.textContent = tab.type.toUpperCase();
+
+      renderTabs();
+      updateEditorStats();
+      updateLineNumbers();
+      refreshPreview();
+    }
+
+    function closeTab(id, event) {
+      if (event) event.stopPropagation();
+
+      const index = state.tabs.findIndex(t => t.id === id);
+      if (index === -1) return;
+
+      const tabToClose = state.tabs[index];
+
+      // If unsaved changes, prompt user
+      if (tabToClose.isDirty) {
+        if (!confirm(`File "${tabToClose.name}" has unsaved changes. Are you sure you want to close it?`)) {
+          return;
+        }
+      }
+
+      state.tabs.splice(index, 1);
+
+      if (state.tabs.length === 0) {
+        createNewFile();
+      } else if (state.activeTabId === id) {
+        const nextActiveIndex = Math.max(0, index - 1);
+        setActiveTab(state.tabs[nextActiveIndex].id);
+      } else {
+        renderTabs();
+      }
+
+      saveStateToLocalStorage();
+    }
+
+    function closeCurrentTab() {
+      if (state.activeTabId) {
+        closeTab(state.activeTabId);
+      }
+    }
+
+    function renderTabs() {
+      tabContainer.innerHTML = '';
+      
+      state.tabs.forEach(tab => {
+        const isActive = tab.id === state.activeTabId;
+        const tabEl = document.createElement('div');
+        tabEl.className = `flex items-center space-x-2 px-3 py-1.5 text-xs rounded-t-md cursor-pointer border-t border-x transition flex-shrink-0 ${
+          isActive 
+            ? 'bg-slate-900 text-white border-slate-700 border-b-transparent' 
+            : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:bg-slate-900/50 hover:text-slate-200'
+        }`;
+        
+        const iconClass = tab.type === 'html' ? 'fa-brands fa-html5 text-orange-500' : 'fa-brands fa-markdown text-brand-400';
+
+        tabEl.innerHTML = `
+          <i class="${iconClass}"></i>
+          <span class="max-w-[120px] truncate font-medium">${escapeHtml(tab.name)}</span>
+          <span class="text-xs text-amber-400 font-bold ${tab.isDirty ? 'inline' : 'hidden'}">*</span>
+          <button onclick="closeTab('${tab.id}', event)" class="hover:text-red-400 ml-1 rounded p-0.5 text-slate-500 hover:bg-slate-800">
+            <i class="fa-solid fa-xmark text-[10px]"></i>
+          </button>
+        `;
+
+        tabEl.onclick = () => setActiveTab(tab.id);
+        tabContainer.appendChild(tabEl);
+      });
+    }
+
+    /* Native File System Access API & Fallback Operations */
+    async function openFile() {
+      if ('showOpenFilePicker' in window) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [
+              {
+                description: 'Markdown & HTML Files',
+                accept: {
+                  'text/markdown': ['.md', '.markdown'],
+                  'text/html': ['.html', '.htm'],
+                  'text/plain': ['.txt']
+                }
+              }
+            ],
+            multiple: false
+          });
+
+          const file = await handle.getFile();
+          const content = await file.text();
+          
+          const id = 'tab_' + Date.now() + '_' + state.nextTabId++;
+          const newTab = {
+            id,
+            name: file.name,
+            content,
+            fileHandle: handle,
+            isDirty: false,
+            type: file.name.endsWith('.html') || file.name.endsWith('.htm') ? 'html' : 'md'
+          };
+
+          state.tabs.push(newTab);
+          setActiveTab(id);
+          saveStateToLocalStorage();
+          showToast(`Opened file "${file.name}"`);
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            showToast('Error opening file', 'error');
+          }
+        }
+      } else {
+        // Fallback to traditional file input
+        document.getElementById('fallback-file-input').click();
+      }
+    }
+
+    function handleFallbackFileOpen(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        const id = 'tab_' + Date.now() + '_' + state.nextTabId++;
+        const newTab = {
+          id,
+          name: file.name,
+          content,
+          fileHandle: null,
+          isDirty: false,
+          type: file.name.endsWith('.html') || file.name.endsWith('.htm') ? 'html' : 'md'
+        };
+
+        state.tabs.push(newTab);
+        setActiveTab(id);
+        saveStateToLocalStorage();
+        showToast(`Opened file "${file.name}"`);
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    async function saveActiveFile() {
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (!activeTab) return;
+
+      activeTab.content = editor.value;
+
+      if (activeTab.fileHandle && 'createWritable' in activeTab.fileHandle) {
+        try {
+          const writable = await activeTab.fileHandle.createWritable();
+          await writable.write(activeTab.content);
+          await writable.close();
+          
+          activeTab.isDirty = false;
+          renderTabs();
+          saveStateToLocalStorage();
+          showToast(`Saved "${activeTab.name}"`);
+        } catch (err) {
+          showToast('Failed to save file', 'error');
+        }
+      } else {
+        saveActiveFileAs();
+      }
+    }
+
+    async function saveActiveFileAs() {
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (!activeTab) return;
+
+      activeTab.content = editor.value;
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const ext = activeTab.type === 'html' ? '.html' : '.md';
+          const handle = await window.showSaveFilePicker({
+            suggestedName: activeTab.name.includes('.') ? activeTab.name : activeTab.name + ext,
+            types: [
+              {
+                description: activeTab.type === 'html' ? 'HTML File' : 'Markdown File',
+                accept: activeTab.type === 'html' 
+                  ? { 'text/html': ['.html', '.htm'] } 
+                  : { 'text/markdown': ['.md'] }
+              }
+            ]
+          });
+
+          const writable = await handle.createWritable();
+          await writable.write(activeTab.content);
+          await writable.close();
+
+          const file = await handle.getFile();
+          activeTab.name = file.name;
+          activeTab.fileHandle = handle;
+          activeTab.isDirty = false;
+          activeTab.type = file.name.endsWith('.html') || file.name.endsWith('.htm') ? 'html' : 'md';
+
+          renderTabs();
+          saveStateToLocalStorage();
+          showToast(`Saved as "${activeTab.name}"`);
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            showToast('Failed to save file', 'error');
+          }
+        }
+      } else {
+        // Blob Download Fallback
+        const blob = new Blob([activeTab.content], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = activeTab.name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        activeTab.isDirty = false;
+        renderTabs();
+        saveStateToLocalStorage();
+        showToast(`Downloaded "${activeTab.name}"`);
+      }
+    }
+
+    function exportDocument(format) {
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (!activeTab) return;
+
+      if (format === 'pdf') {
+        window.print();
+      } else if (format === 'html') {
+        let fullHtml = '';
+        if (activeTab.type === 'html') {
+          fullHtml = editor.value;
+        } else {
+          fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(activeTab.name)}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 2rem; max-width: 800px; margin: 0 auto; line-height: 1.6; color: #333; }
+    pre { background: #f4f4f4; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+    blockquote { border-left: 4px solid #0ea5e9; margin: 0; padding-left: 1rem; color: #666; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+  </style>
+</head>
+<body>
+  ${marked.parse(editor.value)}
+</body>
+</html>`;
+        }
+
+        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = activeTab.name.replace(/\.[^/.]+$/, "") + ".rendered.html";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('Exported Rendered HTML');
+      }
+    }
+
+    /* Live Preview & Line Numbers Sync */
+    function refreshPreview() {
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (!activeTab) return;
+
+      const val = editor.value;
+
+      if (activeTab.type === 'html') {
+        renderTarget.classList.add('hidden');
+        htmlIframe.classList.remove('hidden');
+        
+        // Write content inside sandboxed iframe
+        const doc = htmlIframe.contentDocument || htmlIframe.contentWindow.document;
+        doc.open();
+        doc.write(val);
+        doc.close();
+      } else {
+        htmlIframe.classList.add('hidden');
+        renderTarget.classList.remove('hidden');
+        renderTarget.className = "flex-1 overflow-auto p-6 text-slate-200 markdown-preview";
+        
+        try {
+          renderTarget.innerHTML = marked.parse(val);
+          // Re-trigger syntax highlighting for standard blocks
+          renderTarget.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+        } catch (e) {
+          renderTarget.innerHTML = `<div class="text-red-400 p-4 bg-red-950/30 rounded border border-red-800">Preview Parsing Error: ${escapeHtml(e.message)}</div>`;
+        }
+      }
+    }
+
+    function updateLineNumbers() {
+      if (!state.lineNumbers) return;
+      const lines = editor.value.split('\n').length;
+      let lineNumsHtml = '';
+      for (let i = 1; i <= lines; i++) {
+        lineNumsHtml += `<div>${i}</div>`;
+      }
+      lineNumbersEl.innerHTML = lineNumsHtml;
+    }
+
+    function updateEditorStats() {
+      const text = editor.value;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const chars = text.length;
+
+      document.getElementById('word-count').textContent = `${words} words`;
+      document.getElementById('char-count').textContent = `${chars} chars`;
+
+      // Update Cursor position
+      const cursorPos = editor.selectionStart;
+      const textUpToCursor = text.substring(0, cursorPos);
+      const lineNo = textUpToCursor.split('\n').length;
+      const colNo = cursorPos - textUpToCursor.lastIndexOf('\n');
+      document.getElementById('cursor-pos').textContent = `Ln ${lineNo}, Col ${colNo}`;
+    }
+
+    /* Formatting Helper Functions */
+    function insertFormatting(type) {
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const text = editor.value;
+      const selected = text.substring(start, end);
+
+      let replacement = '';
+      let cursorOffset = 0;
+
+      switch(type) {
+        case 'bold':
+          replacement = `**${selected || 'bold text'}**`;
+          cursorOffset = selected ? replacement.length : 2;
+          break;
+        case 'italic':
+          replacement = `*${selected || 'italic text'}*`;
+          cursorOffset = selected ? replacement.length : 1;
+          break;
+        case 'h1':
+          replacement = `# ${selected || 'Heading 1'}`;
+          cursorOffset = replacement.length;
+          break;
+        case 'h2':
+          replacement = `## ${selected || 'Heading 2'}`;
+          cursorOffset = replacement.length;
+          break;
+        case 'quote':
+          replacement = `> ${selected || 'Blockquote'}`;
+          cursorOffset = replacement.length;
+          break;
+        case 'code':
+          replacement = `\`\`\`javascript\n${selected || '// code here'}\n\`\`\``;
+          cursorOffset = replacement.length;
+          break;
+        case 'link':
+          replacement = `[${selected || 'link text'}](https://example.com)`;
+          cursorOffset = replacement.length;
+          break;
+        case 'image':
+          replacement = `![${selected || 'alt text'}](https://via.placeholder.com/300)`;
+          cursorOffset = replacement.length;
+          break;
+        case 'table':
+          replacement = `\n| Header 1 | Header 2 |\n| -------- | -------- |\n| Item 1   | Item 2   |\n`;
+          cursorOffset = replacement.length;
+          break;
+        case 'checklist':
+          replacement = `\n- [ ] Task item 1\n- [x] Task item 2\n`;
+          cursorOffset = replacement.length;
+          break;
+      }
+
+      editor.value = text.substring(0, start) + replacement + text.substring(end);
+      editor.focus();
+      editor.setSelectionRange(start + cursorOffset, start + cursorOffset);
+
+      onEditorInput();
+    }
+
+    /* Editor Events & Listeners */
+    function setupEventListeners() {
+      editor.addEventListener('input', onEditorInput);
+      editor.addEventListener('keyup', updateEditorStats);
+      editor.addEventListener('click', updateEditorStats);
+
+      // Sync Line Numbers Scrolling
+      editor.addEventListener('scroll', () => {
+        lineNumbersEl.scrollTop = editor.scrollTop;
+      });
+
+      // Drag and Drop File Support
+      window.addEventListener('dragover', (e) => e.preventDefault());
+      window.addEventListener('drop', handleFileDrop);
+
+      // Keyboard Shortcuts Listener
+      window.addEventListener('keydown', handleKeyboardShortcuts);
+    }
+
+    function onEditorInput() {
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (activeTab) {
+        activeTab.content = editor.value;
+        if (!activeTab.isDirty) {
+          activeTab.isDirty = true;
+          renderTabs();
+        }
+      }
+
+      updateLineNumbers();
+      updateEditorStats();
+      refreshPreview();
+      saveStateToLocalStorage();
+    }
+
+    function handleFileDrop(e) {
+      e.preventDefault();
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const id = 'tab_' + Date.now() + '_' + state.nextTabId++;
+          const newTab = {
+            id,
+            name: file.name,
+            content: event.target.result,
+            fileHandle: null,
+            isDirty: false,
+            type: file.name.endsWith('.html') || file.name.endsWith('.htm') ? 'html' : 'md'
+          };
+          state.tabs.push(newTab);
+          setActiveTab(id);
+          saveStateToLocalStorage();
+          showToast(`Opened dropped file "${file.name}"`);
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function handleKeyboardShortcuts(e) {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 'n':
+            e.preventDefault();
+            createNewFile();
+            break;
+          case 'o':
+            e.preventDefault();
+            openFile();
+            break;
+          case 's':
+            e.preventDefault();
+            if (e.shiftKey) {
+              saveActiveFileAs();
+            } else {
+              saveActiveFile();
+            }
+            break;
+          case 'w':
+            e.preventDefault();
+            closeCurrentTab();
+            break;
+          case 'f':
+            e.preventDefault();
+            openFindReplaceModal();
+            break;
+          case 'b':
+            e.preventDefault();
+            insertFormatting('bold');
+            break;
+          case 'i':
+            e.preventDefault();
+            insertFormatting('italic');
+            break;
+          case 'p':
+            e.preventDefault();
+            exportDocument('pdf');
+            break;
+        }
+      }
+    }
+
+    /* Split Pane Resizer Setup */
+    function setupSplitter() {
+      let isDragging = false;
+
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        document.body.style.cursor = 'col-resize';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const containerWidth = document.getElementById('workspace-container').clientWidth;
+        const leftWidth = (e.clientX / containerWidth) * 100;
+
+        if (leftWidth > 15 && leftWidth < 85) {
+          editorPane.style.width = `${leftWidth}%`;
+          previewPane.style.width = `${100 - leftWidth}%`;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          document.body.style.cursor = 'default';
+        }
+      });
+    }
+
+    /* View Modes & Settings Toggles */
+    function setPreviewMode(mode) {
+      state.previewMode = mode;
+      
+      const btnEdit = document.getElementById('btn-mode-edit');
+      const btnSplit = document.getElementById('btn-mode-split');
+      const btnPreview = document.getElementById('btn-mode-preview');
+
+      // Reset Styles
+      [btnEdit, btnSplit, btnPreview].forEach(btn => {
+        btn.className = "px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-white transition";
+      });
+
+      if (mode === 'edit') {
+        editorPane.classList.remove('hidden');
+        editorPane.style.width = '100%';
+        previewPane.classList.add('hidden');
+        splitter.classList.add('hidden');
+        btnEdit.className += " bg-slate-700 text-white font-bold";
+      } else if (mode === 'preview') {
+        editorPane.classList.add('hidden');
+        previewPane.classList.remove('hidden');
+        previewPane.style.width = '100%';
+        splitter.classList.add('hidden');
+        btnPreview.className += " bg-slate-700 text-white font-bold";
+      } else { // Split View
+        editorPane.classList.remove('hidden');
+        previewPane.classList.remove('hidden');
+        editorPane.style.width = '50%';
+        previewPane.style.width = '50%';
+        splitter.classList.remove('hidden');
+        btnSplit.className += " bg-slate-700 text-white font-bold";
+      }
+    }
+
+    function toggleWordWrap() {
+      state.wordWrap = !state.wordWrap;
+      const status = document.getElementById('wrap-status');
+      if (state.wordWrap) {
+        editor.classList.add('wrap');
+        status.textContent = 'ON';
+      } else {
+        editor.classList.remove('wrap');
+        status.textContent = 'OFF';
+      }
+    }
+
+    function toggleLineNumbers() {
+      state.lineNumbers = !state.lineNumbers;
+      const status = document.getElementById('lines-status');
+      if (state.lineNumbers) {
+        lineNumbersEl.classList.remove('hidden');
+        status.textContent = 'ON';
+        updateLineNumbers();
+      } else {
+        lineNumbersEl.classList.add('hidden');
+        status.textContent = 'OFF';
+      }
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      const hljsTheme = document.getElementById('hljs-theme');
+      
+      if (body.classList.contains('dark')) {
+        body.classList.remove('dark', 'bg-slate-900', 'text-slate-100');
+        body.classList.add('bg-slate-50', 'text-slate-900');
+        hljsTheme.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css";
+        state.theme = 'light';
+      } else {
+        body.classList.remove('bg-slate-50', 'text-slate-900');
+        body.classList.add('dark', 'bg-slate-900', 'text-slate-100');
+        hljsTheme.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css";
+        state.theme = 'dark';
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    /* Undo / Redo / Text Select Handlers */
+    function execUndo() { document.execCommand('undo'); }
+    function execRedo() { document.execCommand('redo'); }
+    function selectAllText() {
+      editor.focus();
+      editor.select();
+    }
+
+    /* Modal Management */
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function openFindReplaceModal() {
+      const selected = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+      if (selected) {
+        document.getElementById('find-input').value = selected;
+      }
+      openModal('find-modal');
+      document.getElementById('find-input').focus();
+    }
+
+    function performReplace(replaceAll = false) {
+      const findVal = document.getElementById('find-input').value;
+      const replaceVal = document.getElementById('replace-input').value;
+
+      if (!findVal) return;
+
+      if (replaceAll) {
+        const count = (editor.value.match(new RegExp(escapeRegExp(findVal), 'g')) || []).length;
+        editor.value = editor.value.split(findVal).join(replaceVal);
+        showToast(`Replaced ${count} occurrences`);
+      } else {
+        const start = editor.selectionStart;
+        const text = editor.value;
+        const index = text.indexOf(findVal, start);
+
+        if (index !== -1) {
+          editor.value = text.substring(0, index) + replaceVal + text.substring(index + findVal.length);
+          editor.setSelectionRange(index, index + replaceVal.length);
+          editor.focus();
+        } else {
+          // Wrap search around
+          const firstIndex = text.indexOf(findVal);
+          if (firstIndex !== -1) {
+            editor.value = text.substring(0, firstIndex) + replaceVal + text.substring(firstIndex + findVal.length);
+            editor.setSelectionRange(firstIndex, firstIndex + replaceVal.length);
+            editor.focus();
+          } else {
+            showToast('Text not found', 'error');
+          }
+        }
+      }
+
+      onEditorInput();
+      if (!replaceAll) closeModal('find-modal');
+    }
+
+    /* Storage & Draft Recovery */
+    function saveStateToLocalStorage() {
+      try {
+        const serializableTabs = state.tabs.map(t => ({
+          id: t.id,
+          name: t.name,
+          content: t.content,
+          isDirty: t.isDirty,
+          type: t.type
+        }));
+
+        const appData = {
+          tabs: serializableTabs,
+          activeTabId: state.activeTabId,
+          nextTabId: state.nextTabId
+        };
+
+        localStorage.setItem('omni_edit_state', JSON.stringify(appData));
+      } catch (e) {
+        // Handle quota limit if necessary
+      }
+    }
+
+    function loadSavedState() {
+      try {
+        const saved = localStorage.getItem('omni_edit_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.tabs && parsed.tabs.length > 0) {
+            state.tabs = parsed.tabs;
+            state.nextTabId = parsed.nextTabId || parsed.tabs.length + 1;
+            setActiveTab(parsed.activeTabId || parsed.tabs[0].id);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load storage state', e);
+      }
+    }
+
+    /* Helper Utilities */
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function updateEditorView() {
+      setPreviewMode(state.previewMode);
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const bgColor = type === 'error' ? 'bg-red-600' : 'bg-brand-600';
+      const icon = type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+
+      toast.className = `${bgColor} text-white px-3 py-2 rounded shadow-lg text-xs flex items-center space-x-2 toast-enter pointer-events-auto`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('toast-enter');
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

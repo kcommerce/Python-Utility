@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid Diagram Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Mermaid.js CDN (works seamlessly offline once cached by browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    .code-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.6);
+    }
+    /* Split pane gutter */
+    .gutter-col {
+      cursor: col-resize;
+      transition: background-color 0.15s ease;
+    }
+    .gutter-col:hover, .gutter-col.dragging {
+      background-color: #3b82f6 !important;
+    }
+    /* Grid background pattern for preview canvas */
+    .canvas-grid-dark {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    }
+    .canvas-grid-light {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    }
+    /* Line numbers highlight */
+    .line-number {
+      line-height: 1.5rem;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen flex flex-col antialiased select-none">
+
+  <!-- ================= TOP MAIN HEADER ================= -->
+  <header class="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-3 md:px-4 z-20 flex-shrink-0">
+    <div class="flex items-center space-x-3">
+      <!-- Logo -->
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+        </div>
+        <span class="font-bold text-sm md:text-base tracking-tight text-white flex items-center gap-1.5">
+          Mermaid <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Studio</span>
+        </span>
+      </div>
+
+      <div class="h-5 w-px bg-slate-800 mx-1 hidden sm:block"></div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center space-x-1">
+        <button id="btn-new" title="New Diagram (Ctrl+N)" class="px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span class="hidden sm:inline">New</span>
+        </button>
+
+        <label class="px-2.5 py-1.5 text-xs font-medium rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer" title="Open .mmd, .mermaid, .txt">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span class="hidden sm:inline">Open</span>
+          <input type="file" id="file-input" multiple accept=".mmd,.mermaid,.txt,.md" class="hidden">
+        </label>
+
+        <!-- Template Gallery Button -->
+        <button id="btn-templates-menu" title="Browse sample templates (Ctrl+T)" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-200 transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <span>Templates</span>
+          <span class="hidden sm:inline text-[10px] px-1.5 rounded-full bg-blue-500/20 text-blue-200">24</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Controls: Export & Theme -->
+    <div class="flex items-center space-x-2">
+      <!-- Export Menu -->
+      <div class="relative">
+        <button id="btn-export-menu" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>Export</span>
+          <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="export-dropdown" class="hidden absolute right-0 mt-1 w-48 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700 py-1.5 z-50 text-xs">
+          <button id="btn-export-mmd" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            📄 Mermaid Code (.mmd)
+          </button>
+          <button id="btn-export-svg" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            📐 Vector Image (.svg)
+          </button>
+          <button id="btn-export-png" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            🖼️ High-Res PNG (Solid)
+          </button>
+          <button id="btn-export-png-trans" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            ✨ PNG (Transparent)
+          </button>
+          <div class="h-px bg-slate-700 my-1"></div>
+          <button id="btn-copy-code" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            📋 Copy Mermaid Code
+          </button>
+          <button id="btn-copy-svg" class="w-full text-left px-3 py-2 hover:bg-blue-600/20 hover:text-blue-300 flex items-center gap-2">
+            📋 Copy SVG Markup
+          </button>
+        </div>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button id="btn-theme-toggle" class="p-2 text-slate-400 hover:text-slate-100 rounded-lg hover:bg-slate-800 transition" title="Toggle Dark/Light Mode">
+        <svg id="theme-moon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        <svg id="theme-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= TAB BAR ================= -->
+  <div class="h-10 bg-slate-950/80 border-b border-slate-800 flex items-center px-2 space-x-1 overflow-x-auto flex-shrink-0 select-none" id="tabs-container">
+    <!-- Tabs will be rendered here dynamically -->
+    <div id="tabs-list" class="flex items-center space-x-1"></div>
+
+    <!-- New Tab (+) Button -->
+    <button id="btn-add-tab" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded transition flex-shrink-0 ml-1" title="New Tab">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    </button>
+  </div>
+
+  <!-- ================= MAIN SPLIT WORKSPACE ================= -->
+  <main class="flex-1 flex overflow-hidden relative" id="split-container">
+
+    <!-- LEFT PANE: CODE EDITOR -->
+    <section id="editor-pane" class="w-1/2 flex flex-col min-w-[280px] bg-slate-900 border-r border-slate-800 relative">
+      <!-- Editor Header / Info -->
+      <div class="h-8 bg-slate-900/90 border-b border-slate-800/80 px-3 flex items-center justify-between text-xs text-slate-400 select-none">
+        <div class="flex items-center gap-2">
+          <span>SOURCE CODE</span>
+          <span id="char-line-info" class="text-[10px] text-slate-500">Ln 1, Col 1</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-editor-templates" class="text-blue-400 hover:text-blue-300 transition" title="Browse sample templates">Templates</button>
+          <span class="text-slate-700">•</span>
+          <button id="btn-format" class="hover:text-blue-400 transition" title="Auto-indent / Clean lines">Clean</button>
+          <span class="text-slate-700">•</span>
+          <button id="btn-clear" class="hover:text-red-400 transition" title="Clear current editor content">Clear</button>
+        </div>
+      </div>
+
+      <!-- Code Editor with line numbers -->
+      <div class="flex-1 flex relative overflow-hidden bg-slate-900">
+        <!-- Line numbers column -->
+        <div id="line-numbers" class="w-10 pt-3 pb-3 pr-2 text-right text-xs code-font text-slate-600 bg-slate-950/40 select-none overflow-hidden flex-shrink-0">
+          <div>1</div>
+        </div>
+        <!-- Raw Textarea -->
+        <textarea id="code-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" class="flex-1 h-full p-3 pl-1 resize-none bg-transparent text-slate-200 code-font text-sm leading-6 outline-none focus:ring-0 border-0 whitespace-pre overflow-auto" placeholder="Type Mermaid diagram syntax here..."></textarea>
+      </div>
+
+      <!-- Syntax Error Notification Toast (Floating bottom of left pane) -->
+      <div id="error-banner" class="hidden absolute bottom-3 left-3 right-3 bg-red-950/90 border border-red-800 text-red-200 px-3 py-2.5 rounded-lg text-xs shadow-xl backdrop-blur flex items-start gap-2.5 z-30 transition-all">
+        <svg class="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="flex-1 overflow-hidden">
+          <div class="font-semibold text-red-300">Syntax Error</div>
+          <div id="error-message" class="font-mono text-[11px] truncate mt-0.5 text-red-200">Invalid diagram syntax</div>
+        </div>
+        <button id="btn-dismiss-error" class="text-red-400 hover:text-white ml-1">✕</button>
+      </div>
+    </section>
+
+    <!-- SPLITTER GUTTER -->
+    <div id="drag-gutter" class="gutter-col w-1.5 bg-slate-800/80 hover:bg-blue-500 cursor-col-resize z-20 flex-shrink-0"></div>
+
+    <!-- RIGHT PANE: DIAGRAM PREVIEW -->
+    <section id="preview-pane" class="flex-1 flex flex-col min-w-[280px] bg-slate-950 relative overflow-hidden">
+      <!-- Preview Header with Pan/Zoom Toolbar -->
+      <div class="h-8 bg-slate-900/90 border-b border-slate-800/80 px-3 flex items-center justify-between text-xs text-slate-400 z-10 select-none">
+        <div class="flex items-center gap-2">
+          <span>RENDERED DIAGRAM</span>
+          <span id="zoom-badge" class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-blue-400 font-mono">100%</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <button id="btn-zoom-in" class="p-1 hover:text-white rounded hover:bg-slate-800 transition" title="Zoom In (+)">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          </button>
+          <button id="btn-zoom-out" class="p-1 hover:text-white rounded hover:bg-slate-800 transition" title="Zoom Out (-)">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+          </button>
+          <button id="btn-zoom-reset" class="px-1.5 py-0.5 text-[11px] hover:text-white rounded hover:bg-slate-800 transition" title="Reset Zoom">
+            1:1
+          </button>
+          <button id="btn-zoom-fit" class="p-1 hover:text-white rounded hover:bg-slate-800 transition" title="Fit to Screen">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Canvas Area -->
+      <div id="canvas-container" class="flex-1 w-full h-full relative overflow-hidden cursor-grab active:cursor-grabbing canvas-grid-dark flex items-center justify-center">
+        <!-- Render Transform Wrapper -->
+        <div id="render-viewport" class="origin-center transition-transform duration-75 flex items-center justify-center pointer-events-auto">
+          <div id="mermaid-output" class="p-8"></div>
+        </div>
+      </div>
+
+      <!-- Hint tag -->
+      <div class="absolute bottom-2 right-2 text-[10px] text-slate-500 bg-slate-900/70 backdrop-blur px-2 py-0.5 rounded pointer-events-none select-none">
+        Drag to Pan • Scroll to Zoom
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= TEMPLATE GALLERY MODAL ================= -->
+  <div id="template-modal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-6xl max-h-full flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal header -->
+      <div class="px-4 md:px-5 py-3 border-b border-slate-800 flex flex-wrap items-center gap-3 flex-shrink-0">
+        <div class="mr-auto">
+          <h3 class="font-semibold text-sm md:text-base text-white">Sample Templates</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Click a template to load it. Or type its number (1–24) on your keyboard.</p>
+        </div>
+        <!-- Load mode toggle -->
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-400 hidden sm:inline">Load into:</span>
+          <div class="flex rounded-lg bg-slate-950 border border-slate-800 p-0.5">
+            <button id="mode-new" class="mode-btn px-2.5 py-1 rounded-md font-medium transition" data-mode="new">New tab</button>
+            <button id="mode-replace" class="mode-btn px-2.5 py-1 rounded-md font-medium transition" data-mode="replace">Current tab</button>
+          </div>
+        </div>
+        <button id="btn-template-close" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Close (Esc)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <!-- Filter chips -->
+      <div id="template-filters" class="px-4 md:px-5 py-2 border-b border-slate-800/70 flex items-center gap-1.5 overflow-x-auto flex-shrink-0"></div>
+      <!-- Gallery body -->
+      <div id="template-gallery" class="flex-1 overflow-y-auto px-4 md:px-5 py-4 space-y-6"></div>
+    </div>
+  </div>
+
+  <!-- Rename Modal Dialog -->
+  <div id="rename-modal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-sm shadow-2xl">
+      <h3 class="font-semibold text-sm text-slate-100 mb-2">Rename Diagram</h3>
+      <input type="text" id="rename-input" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-blue-500 mb-4" placeholder="diagram_name">
+      <div class="flex justify-end space-x-2">
+        <button id="btn-rename-cancel" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">Cancel</button>
+        <button id="btn-rename-save" class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium">Rename</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirmation Modal (Never use browser alert/confirm) -->
+  <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-sm shadow-2xl">
+      <h3 id="confirm-title" class="font-semibold text-sm text-slate-100 mb-1">Confirm Action</h3>
+      <p id="confirm-message" class="text-xs text-slate-400 mb-4">Are you sure you want to proceed?</p>
+      <div class="flex justify-end space-x-2">
+        <button id="btn-confirm-cancel" class="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">Cancel</button>
+        <button id="btn-confirm-ok" class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium">Close Without Saving</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Message -->
+  <div id="toast" class="fixed top-16 right-4 bg-slate-800 border border-slate-700 text-slate-200 px-3.5 py-2 rounded-lg text-xs shadow-xl backdrop-blur transform transition-all duration-200 translate-y-[-20px] opacity-0 pointer-events-none z-50 flex items-center gap-2">
+    <span id="toast-icon">✅</span>
+    <span id="toast-text">Operation completed</span>
+  </div>
+
+  <!-- ================= JAVASCRIPT LOGIC ================= -->
+  <script>
+    // --- Preset Diagram Templates ---
+    // Numbered 1-12 as specified, 13-15 use case, 16-18 architecture, 19-21 network, 22-24 extra diagram types.
+    const TEMPLATE_GROUPS = [
+      { key: 'flowchart', label: 'Flowchart', icon: '📊', purpose: 'Processes and workflows' },
+      { key: 'class',     label: 'Class diagram', icon: '📦', purpose: 'Object-oriented system structure' },
+      { key: 'sequence',  label: 'Sequence diagram', icon: '🔄', purpose: 'Interactions over time' },
+      { key: 'state',     label: 'State diagram', icon: '🚦', purpose: 'State transitions' },
+      { key: 'mindmap',   label: 'Mind map', icon: '🧠', purpose: 'Ideas and concepts' },
+      { key: 'er',        label: 'ER diagram', icon: '🗄️', purpose: 'Database design' },
+      { key: 'usecase',   label: 'Use case diagram', icon: '👥', purpose: 'Actors and system features (drawn with flowchart syntax)' },
+      { key: 'architecture', label: 'Architecture diagram', icon: '🏗️', purpose: 'System components and how they connect (flowchart syntax)' },
+      { key: 'network',   label: 'Network diagram', icon: '🌐', purpose: 'Devices, zones and connections (flowchart syntax)' },
+      { key: 'other',     label: 'More diagram types', icon: '✨', purpose: 'Gantt, pie and git graphs' }
+    ];
+
+    const TEMPLATE_LIST = [
+      // ---------- Flowcharts (1-3) ----------
+      { num: 1, group: 'flowchart', title: 'Basic process', desc: 'Start, decision, loop and end.',
+        code: `flowchart TD
+    A([Start]) --> B[Enter credentials]
+    B --> C{Valid login?}
+    C -- Yes --> D[Show dashboard]
+    C -- No --> E[Show error message]
+    E --> B
+    D --> F([End])` },
+
+      { num: 2, group: 'flowchart', title: 'Approval workflow', desc: 'Branching decisions with styled outcomes.',
+        code: `flowchart TD
+    A([Submit request]) --> B[Manager review]
+    B --> C{Approved?}
+    C -- No --> D[Return with comments]
+    D --> A
+    C -- Yes --> E{Amount over 1000?}
+    E -- No --> G[Auto-approve payment]
+    E -- Yes --> F[Finance review]
+    F --> H{Finance OK?}
+    H -- Yes --> G
+    H -- No --> D
+    G --> I([Request completed])
+
+    classDef good fill:#16a34a,stroke:#166534,color:#fff
+    classDef warn fill:#f59e0b,stroke:#b45309,color:#000
+    class I,G good
+    class D warn` },
+
+      { num: 3, group: 'flowchart', title: 'CI/CD pipeline', desc: 'Left-to-right flow grouped in subgraphs.',
+        code: `flowchart LR
+    subgraph Dev[Development]
+        A[Write code] --> B[Commit and push]
+    end
+    subgraph CI[Continuous Integration]
+        C[Build] --> D[Run tests] --> E{Tests pass?}
+    end
+    subgraph CD[Deployment]
+        F[Deploy to staging] --> G[Deploy to production]
+    end
+    B --> C
+    E -- Yes --> F
+    E -- No --> A` },
+
+      // ---------- Class diagrams (4-6) ----------
+      { num: 4, group: 'class', title: 'Inheritance basics', desc: 'A parent class with two subclasses.',
+        code: `classDiagram
+    class Animal {
+      +String name
+      +int age
+      +makeSound() void
+    }
+    class Dog {
+      +String breed
+      +bark() void
+    }
+    class Cat {
+      +bool isIndoor
+      +climbTree() void
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat` },
+
+      { num: 5, group: 'class', title: 'Interface and composition', desc: 'Interfaces, implementation and aggregation.',
+        code: `classDiagram
+    class Shape {
+      <<interface>>
+      +area() double
+      +perimeter() double
+    }
+    class Circle {
+      -double radius
+      +area() double
+      +perimeter() double
+    }
+    class Rectangle {
+      -double width
+      -double height
+      +area() double
+      +perimeter() double
+    }
+    class Canvas {
+      -List~Shape~ shapes
+      +add(Shape s) void
+      +render() void
+    }
+    Shape <|.. Circle
+    Shape <|.. Rectangle
+    Canvas o-- Shape : contains` },
+
+      { num: 6, group: 'class', title: 'Domain model', desc: 'Relationships with multiplicity (e-commerce).',
+        code: `classDiagram
+    class Customer {
+      +String name
+      +String email
+      +placeOrder() Order
+    }
+    class Order {
+      +int id
+      +Date createdAt
+      +total() double
+    }
+    class OrderItem {
+      +int quantity
+      +double unitPrice
+    }
+    class Product {
+      +String sku
+      +String title
+      +double price
+    }
+    class Payment {
+      <<abstract>>
+      +double amount
+      +pay() bool
+    }
+    class CreditCard
+    class PayPal
+    Customer "1" --> "0..*" Order : places
+    Order "1" *-- "1..*" OrderItem : contains
+    OrderItem "*" --> "1" Product : refers to
+    Order "1" --> "1" Payment : paid by
+    Payment <|-- CreditCard
+    Payment <|-- PayPal` },
+
+      // ---------- Sequence diagrams (7-9) ----------
+      { num: 7, group: 'sequence', title: 'Request and response', desc: 'Simple login between three participants.',
+        code: `sequenceDiagram
+    autonumber
+    actor User
+    participant App as Web App
+    participant API as Backend API
+    User->>App: Enter email and password
+    App->>API: POST /login
+    activate API
+    API-->>App: 200 OK + token
+    deactivate API
+    App-->>User: Show dashboard` },
+
+      { num: 8, group: 'sequence', title: 'Alternatives and loops', desc: 'alt / else, opt and loop fragments.',
+        code: `sequenceDiagram
+    autonumber
+    actor Customer
+    participant Shop
+    participant Bank
+    Customer->>Shop: Checkout
+    loop Until payment succeeds or 3 tries
+        Shop->>Bank: Charge card
+        alt Payment accepted
+            Bank-->>Shop: Approved
+        else Payment declined
+            Bank-->>Shop: Declined
+            Shop-->>Customer: Please try another card
+        end
+    end
+    opt Customer wants a receipt
+        Shop-->>Customer: Email receipt
+    end` },
+
+      { num: 9, group: 'sequence', title: 'Microservices and notes', desc: 'Parallel calls, notes, async message.',
+        code: `sequenceDiagram
+    autonumber
+    actor U as User
+    participant G as API Gateway
+    participant A as Auth Service
+    participant O as Order Service
+    participant I as Inventory Service
+    participant N as Notification Service
+    U->>G: POST /orders
+    G->>A: Validate token
+    A-->>G: Token valid
+    rect rgba(59, 130, 246, 0.15)
+        par Reserve stock
+            G->>I: Reserve items
+            I-->>G: Reserved
+        and Create order
+            G->>O: Create order
+            O-->>G: Order 1042 created
+        end
+    end
+    Note over G,O: Both calls run in parallel
+    G-)N: Send confirmation (async)
+    G-->>U: 201 Created` },
+
+      // ---------- State diagram (10) ----------
+      { num: 10, group: 'state', title: 'Order lifecycle', desc: 'States, transitions and a nested state.',
+        code: `stateDiagram-v2
+    [*] --> Pending
+    Pending --> Paid: Payment received
+    Pending --> Cancelled: Timeout
+    Paid --> Fulfilment
+
+    state Fulfilment {
+        [*] --> Packing
+        Packing --> Shipped
+        Shipped --> Delivered
+        Delivered --> [*]
+    }
+
+    Fulfilment --> Returned: Return requested
+    Returned --> Refunded
+    Refunded --> [*]
+    Cancelled --> [*]
+    Fulfilment --> [*]: Completed` },
+
+      // ---------- Mind map (11) ----------
+      { num: 11, group: 'mindmap', title: 'Project planning', desc: 'Central idea with branches and sub-ideas.',
+        code: `mindmap
+  root((New Product Launch))
+    Research
+      Market size
+      Competitors
+      Customer interviews
+    Product
+      Features
+      Design
+      Pricing
+    Marketing
+      Website
+      Social media
+      Press
+    Operations
+      Team
+      Budget
+      Timeline` },
+
+      // ---------- ER diagram (12) ----------
+      { num: 12, group: 'er', title: 'Online store database', desc: 'Entities, keys and cardinality.',
+        code: `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ ORDER_ITEM : contains
+    PRODUCT ||--o{ ORDER_ITEM : "appears in"
+    CATEGORY ||--o{ PRODUCT : groups
+
+    CUSTOMER {
+        int id PK
+        string name
+        string email UK
+        date created_at
+    }
+    ORDER {
+        int id PK
+        int customer_id FK
+        date order_date
+        string status
+    }
+    ORDER_ITEM {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+    }
+    PRODUCT {
+        int id PK
+        int category_id FK
+        string title
+        decimal price
+    }
+    CATEGORY {
+        int id PK
+        string name
+    }` },
+
+      // ---------- Use case diagrams (13-15) ----------
+      // Mermaid has no native use case diagram type, so these use flowchart syntax:
+      // actors are rounded boxes, use cases are ovals, the system boundary is a subgraph.
+      { num: 13, group: 'usecase', title: 'Basic use cases', desc: 'Two actors and the features they use.',
+        code: `flowchart LR
+    Customer["👤 Customer"]:::actor
+    Admin["👤 Admin"]:::actor
+
+    subgraph Shop["Online Shop"]
+        direction TB
+        UC1([Browse products])
+        UC2([Add to cart])
+        UC3([Place order])
+        UC4([Manage products])
+        UC5([View sales report])
+    end
+
+    Customer --- UC1
+    Customer --- UC2
+    Customer --- UC3
+    Admin --- UC4
+    Admin --- UC5
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff` },
+
+      { num: 14, group: 'usecase', title: 'Include and extend', desc: 'Dotted arrows show include / extend links.',
+        code: `flowchart LR
+    Customer["👤 Customer"]:::actor
+    Bank["🏦 Bank System"]:::external
+
+    subgraph ATM["ATM System"]
+        direction TB
+        UC1([Withdraw cash])
+        UC2([Check balance])
+        UC3([Authenticate with PIN])
+        UC4([Print receipt])
+        UC5([Report card as lost])
+    end
+
+    Customer --- UC1
+    Customer --- UC2
+    Customer --- UC5
+    UC1 -.->|"«include»"| UC3
+    UC2 -.->|"«include»"| UC3
+    UC4 -.->|"«extend»"| UC1
+    UC1 --- Bank
+    UC2 --- Bank
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef external fill:#78350f,stroke:#fbbf24,color:#fff` },
+
+      { num: 15, group: 'usecase', title: 'Actors and roles', desc: 'Actor inheritance plus an external system.',
+        code: `flowchart LR
+    Guest["👤 Guest"]:::actor
+    Member["👤 Member"]:::actor
+    Librarian["👤 Librarian"]:::actor
+    Mail["✉️ Email Service"]:::external
+
+    Member -->|"is a"| Guest
+
+    subgraph Library["Library System"]
+        direction TB
+        UC1([Search catalog])
+        UC2([Register account])
+        UC3([Borrow book])
+        UC4([Return book])
+        UC5([Pay late fee])
+        UC6([Manage inventory])
+        UC7([Send due-date reminder])
+    end
+
+    Guest --- UC1
+    Guest --- UC2
+    Member --- UC3
+    Member --- UC4
+    Member --- UC5
+    Librarian --- UC6
+    Librarian --- UC4
+    UC7 --- Mail
+    UC3 -.->|"«include»"| UC7
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef external fill:#78350f,stroke:#fbbf24,color:#fff` },
+
+      // ---------- Architecture diagrams (16-18) ----------
+      // Drawn with flowchart syntax: subgraphs are tiers/zones, shapes show component types.
+      { num: 16, group: 'architecture', title: 'Three-tier web app', desc: 'Edge, application and data tiers.',
+        code: `flowchart TB
+    User(["👤 Users"]):::actor
+
+    subgraph Edge["Edge"]
+        CDN["CDN"]
+        LB["Load Balancer"]
+    end
+
+    subgraph App["Application Tier"]
+        Web1["Web Server 1"]
+        Web2["Web Server 2"]
+        API["API Service"]
+    end
+
+    subgraph Data["Data Tier"]
+        Cache[("Redis Cache")]
+        DB[("Primary Database")]
+        Replica[("Read Replica")]
+    end
+
+    User --> CDN
+    User --> LB
+    LB --> Web1
+    LB --> Web2
+    Web1 --> API
+    Web2 --> API
+    API --> Cache
+    API --> DB
+    DB -.->|replication| Replica
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff` },
+
+      { num: 17, group: 'architecture', title: 'Microservices', desc: 'Gateway, services, message broker, own databases.',
+        code: `flowchart LR
+    Client(["📱 Web / Mobile Client"]):::actor
+    GW["API Gateway"]:::gateway
+
+    subgraph Services["Services"]
+        Auth["Auth Service"]
+        Orders["Order Service"]
+        Catalog["Catalog Service"]
+        Notify["Notification Service"]
+    end
+
+    Broker{{"Message Broker"}}:::broker
+
+    subgraph Stores["Data Stores"]
+        AuthDB[("Users DB")]
+        OrdersDB[("Orders DB")]
+        CatalogDB[("Catalog DB")]
+    end
+
+    Client --> GW
+    GW --> Auth
+    GW --> Orders
+    GW --> Catalog
+    Auth --> AuthDB
+    Orders --> OrdersDB
+    Catalog --> CatalogDB
+    Orders -->|OrderPlaced| Broker
+    Broker --> Notify
+    Broker --> Catalog
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef gateway fill:#065f46,stroke:#34d399,color:#fff
+    classDef broker fill:#78350f,stroke:#fbbf24,color:#fff` },
+
+      { num: 18, group: 'architecture', title: 'Cloud (VPC) layout', desc: 'Nested subnets with public and private tiers.',
+        code: `flowchart TB
+    Internet(["🌍 Internet"]):::actor
+    DNS["DNS"]
+
+    subgraph Cloud["Cloud Region"]
+        subgraph VPC["VPC 10.0.0.0/16"]
+            subgraph Public["Public subnet"]
+                ALB["Application Load Balancer"]
+                NAT["NAT Gateway"]
+            end
+            subgraph Private["Private subnet"]
+                App1["App Server A"]
+                App2["App Server B"]
+            end
+            subgraph DataNet["Data subnet"]
+                DB[("Database")]
+            end
+        end
+        Storage[("Object Storage")]
+        Monitor["Monitoring and Logs"]
+    end
+
+    Internet --> DNS
+    DNS --> ALB
+    ALB --> App1
+    ALB --> App2
+    App1 --> DB
+    App2 --> DB
+    App1 --> Storage
+    App2 -->|outbound| NAT
+    NAT --> Internet
+    App1 -.-> Monitor
+    App2 -.-> Monitor
+
+    classDef actor fill:#1e3a8a,stroke:#60a5fa,color:#fff` },
+
+      // ---------- Network diagrams (19-21) ----------
+      { num: 19, group: 'network', title: 'Home / small office', desc: 'Modem, router, switch, Wi-Fi and devices.',
+        code: `flowchart TB
+    ISP(["🌍 Internet (ISP)"]):::cloud
+    Modem["Modem"]
+    Router["Router / Firewall"]
+    Switch["Network Switch"]
+    AP(("Wi-Fi AP")):::wifi
+
+    ISP --- Modem --- Router
+    Router --- Switch
+    Router --- AP
+
+    subgraph Wired["Wired devices"]
+        PC["🖥️ Desktop PC"]
+        NAS[("NAS")]
+        Printer["🖨️ Printer"]
+    end
+
+    subgraph Wireless["Wireless devices"]
+        Laptop["💻 Laptop"]
+        Phone["📱 Phone"]
+        TV["📺 Smart TV"]
+    end
+
+    Switch --- PC
+    Switch --- NAS
+    Switch --- Printer
+    AP -.- Laptop
+    AP -.- Phone
+    AP -.- TV
+
+    classDef cloud fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef wifi fill:#065f46,stroke:#34d399,color:#fff` },
+
+      { num: 20, group: 'network', title: 'Enterprise with DMZ', desc: 'Firewalls, DMZ, core switch and VLANs.',
+        code: `flowchart TB
+    Internet(["🌍 Internet"]):::cloud
+    FW1["Edge Firewall"]:::fw
+
+    subgraph DMZ["DMZ"]
+        Web["Web Server"]
+        Mail["Mail Gateway"]
+        Proxy["Reverse Proxy"]
+    end
+
+    FW2["Internal Firewall"]:::fw
+    Core["Core Switch"]
+
+    subgraph Internal["Internal Network"]
+        subgraph V10["VLAN 10 - Staff"]
+            Staff["Workstations"]
+        end
+        subgraph V20["VLAN 20 - Servers"]
+            App["App Servers"]
+            DB[("Database")]
+        end
+        subgraph V30["VLAN 30 - Guests"]
+            Guest["Guest Wi-Fi"]
+        end
+    end
+
+    Internet --- FW1
+    FW1 --- Web
+    FW1 --- Mail
+    FW1 --- Proxy
+    Proxy --- FW2
+    FW2 --- Core
+    Core --- Staff
+    Core --- App
+    App --- DB
+    Core --- Guest
+
+    classDef cloud fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef fw fill:#7f1d1d,stroke:#f87171,color:#fff` },
+
+      { num: 21, group: 'network', title: 'Multi-site WAN with VPN', desc: 'HQ and branches linked by VPN tunnels.',
+        code: `flowchart LR
+    subgraph HQ["Headquarters"]
+        HQLAN["HQ LAN Switch"]
+        HQServers[("Data Center Servers")]
+        HQFW["HQ VPN Gateway"]:::fw
+        HQLAN --- HQServers
+        HQLAN --- HQFW
+    end
+
+    Internet(("🌍 Internet")):::cloud
+
+    subgraph B1["Branch Office A"]
+        B1FW["VPN Router"]:::fw
+        B1LAN["Branch LAN"]
+        B1PC["Workstations"]
+        B1FW --- B1LAN --- B1PC
+    end
+
+    subgraph B2["Branch Office B"]
+        B2FW["VPN Router"]:::fw
+        B2LAN["Branch LAN"]
+        B2PC["Workstations"]
+        B2FW --- B2LAN --- B2PC
+    end
+
+    Remote["💻 Remote Worker"]
+
+    HQFW --- Internet
+    B1FW --- Internet
+    B2FW --- Internet
+    Remote -.->|client VPN| Internet
+    HQFW <-.->|IPsec tunnel| B1FW
+    HQFW <-.->|IPsec tunnel| B2FW
+
+    classDef cloud fill:#1e3a8a,stroke:#60a5fa,color:#fff
+    classDef fw fill:#7f1d1d,stroke:#f87171,color:#fff` },
+
+      // ---------- Extras (22-24) ----------
+      { num: 22, group: 'other', title: 'Gantt chart', desc: 'Project schedule with sections.',
+        code: `gantt
+    title Project Execution Schedule
+    dateFormat  YYYY-MM-DD
+    section Core
+    Design Architecture  :done,    des1, 2026-10-01,2026-10-07
+    Implement Engine     :active,  dev1, 2026-10-08, 10d
+    section Testing
+    Unit Tests           :         test1, after dev1, 5d
+    User Acceptance      :         test2, after test1, 4d` },
+
+      { num: 23, group: 'other', title: 'Pie chart', desc: 'Share of a whole.',
+        code: `pie title Tech Stack Usage
+    "JavaScript" : 45
+    "Mermaid.js" : 30
+    "Tailwind CSS" : 15
+    "HTML5" : 10` },
+
+      { num: 24, group: 'other', title: 'Git graph', desc: 'Branches, commits and merges.',
+        code: `gitGraph
+    commit
+    commit
+    branch feature/zoom
+    checkout feature/zoom
+    commit id: "add pan"
+    commit id: "add zoom"
+    checkout main
+    merge feature/zoom
+    commit id: "v1.0 release"` }
+    ];
+
+    // Legacy lookup by diagram type (used for new tabs and defaults)
+    const byNum = n => TEMPLATE_LIST.find(t => t.num === n).code;
+    const TEMPLATES = {
+      flowchart: byNum(1),
+      class:     byNum(4),
+      sequence:  byNum(7),
+      state:     byNum(10),
+      mindmap:   byNum(11),
+      er:        byNum(12),
+      usecase:   byNum(13),
+      architecture: byNum(16),
+      network:   byNum(19),
+      gantt:     byNum(22),
+      pie:       byNum(23),
+      git:       byNum(24)
+    };
+
+    // --- State Management ---
+    const STORAGE_KEY = 'MERMAID_STUDIO_WORKSPACE_V1';
+    const THEME_KEY = 'MERMAID_STUDIO_THEME';
+
+    let appState = {
+      files: [],
+      activeFileId: null,
+      theme: 'dark' // 'dark' or 'light'
+    };
+
+    // Zoom and Pan Transform State
+    let zoomState = {
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      isDragging: false,
+      startX: 0,
+      startY: 0
+    };
+
+    // DOM Elements
+    const tabsListEl = document.getElementById('tabs-list');
+    const codeEditorEl = document.getElementById('code-editor');
+    const lineNumbersEl = document.getElementById('line-numbers');
+    const mermaidOutputEl = document.getElementById('mermaid-output');
+    const renderViewportEl = document.getElementById('render-viewport');
+    const canvasContainerEl = document.getElementById('canvas-container');
+    const zoomBadgeEl = document.getElementById('zoom-badge');
+    const errorBannerEl = document.getElementById('error-banner');
+    const errorMessageEl = document.getElementById('error-message');
+    const charLineInfoEl = document.getElementById('char-line-info');
+
+    // Debounce timer for rendering
+    let renderDebounceTimer = null;
+
+    // Initialize Mermaid Library
+    function initMermaid(theme = 'dark') {
+      try {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: theme === 'dark' ? 'dark' : 'default',
+          securityLevel: 'loose',
+          fontFamily: 'Inter, sans-serif'
+        });
+      } catch (e) {
+        console.error("Mermaid initialization failed", e);
+      }
+    }
+
+    // --- Tab / File Class ---
+    function createFile(title = 'Diagram', code = TEMPLATES.flowchart) {
+      return {
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        title: title,
+        code: code,
+        isModified: false
+      };
+    }
+
+    // --- Persistence (localStorage) ---
+    function saveToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          files: appState.files,
+          activeFileId: appState.activeFileId
+        }));
+      } catch (err) {
+        console.warn("Storage quota exceeded or unavailable", err);
+      }
+    }
+
+    function loadFromStorage() {
+      try {
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (savedTheme) {
+          appState.theme = savedTheme;
+        }
+
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (data) {
+          const parsed = JSON.parse(data);
+          if (parsed && Array.isArray(parsed.files) && parsed.files.length > 0) {
+            appState.files = parsed.files;
+            appState.activeFileId = parsed.activeFileId || parsed.files[0].id;
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Error loading from localStorage", err);
+      }
+
+      // Default initial files if nothing stored
+      const initial1 = createFile('Flowchart Demo.mmd', TEMPLATES.flowchart);
+      const initial2 = createFile('Sequence.mmd', TEMPLATES.sequence);
+      appState.files = [initial1, initial2];
+      appState.activeFileId = initial1.id;
+    }
+
+    // --- Theme Application ---
+    function applyTheme(theme) {
+      appState.theme = theme;
+      localStorage.setItem(THEME_KEY, theme);
+      const html = document.documentElement;
+      const sunIcon = document.getElementById('theme-sun');
+      const moonIcon = document.getElementById('theme-moon');
+
+      if (theme === 'dark') {
+        html.classList.add('dark');
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+        canvasContainerEl.classList.remove('canvas-grid-light');
+        canvasContainerEl.classList.add('canvas-grid-dark');
+      } else {
+        html.classList.remove('dark');
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+        canvasContainerEl.classList.remove('canvas-grid-dark');
+        canvasContainerEl.classList.add('canvas-grid-light');
+      }
+
+      initMermaid(theme);
+      if (typeof thumbCache !== 'undefined') { thumbCache.clear(); }
+      triggerRender();
+      if (typeof isGalleryOpen === 'function' && isGalleryOpen()) renderGalleryThumbnails();
+    }
+
+    // --- Tab Rendering ---
+    function renderTabs() {
+      tabsListEl.innerHTML = '';
+      appState.files.forEach(file => {
+        const isActive = file.id === appState.activeFileId;
+        const tabEl = document.createElement('div');
+        tabEl.className = `group flex items-center h-8 px-3 rounded-t-md text-xs font-medium cursor-pointer border-t-2 transition-colors max-w-[200px] flex-shrink-0 ${
+          isActive 
+            ? 'bg-slate-900 border-blue-500 text-white shadow-sm' 
+            : 'bg-slate-950/40 border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-300'
+        }`;
+
+        // Unsaved changes dot
+        const unsavedDot = file.isModified 
+          ? `<span class="w-2 h-2 rounded-full bg-blue-400 mr-1.5 flex-shrink-0" title="Modified"></span>` 
+          : '';
+
+        tabEl.innerHTML = `
+          ${unsavedDot}
+          <span class="truncate mr-2 file-title">${escapeHtml(file.title)}</span>
+          <button class="btn-close-tab p-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-700/60 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" title="Close Tab">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        `;
+
+        // Switch Tab Click
+        tabEl.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-close-tab')) return;
+          switchTab(file.id);
+        });
+
+        // Double click to rename
+        tabEl.addEventListener('dblclick', () => {
+          promptRenameTab(file.id);
+        });
+
+        // Close Tab Click
+        const closeBtn = tabEl.querySelector('.btn-close-tab');
+        closeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleCloseTab(file.id);
+        });
+
+        tabsListEl.appendChild(tabEl);
+      });
+    }
+
+    function getActiveFile() {
+      return appState.files.find(f => f.id === appState.activeFileId) || appState.files[0];
+    }
+
+    function switchTab(fileId) {
+      if (appState.activeFileId === fileId) return;
+      appState.activeFileId = fileId;
+      const file = getActiveFile();
+      if (file) {
+        codeEditorEl.value = file.code;
+        updateLineNumbers();
+        updateCursorInfo();
+        triggerRender();
+      }
+      renderTabs();
+      saveToStorage();
+    }
+
+    function createNewTab(title = 'Untitled.mmd', code = TEMPLATES.flowchart) {
+      const newFile = createFile(title, code);
+      appState.files.push(newFile);
+      switchTab(newFile.id);
+      showToast('Created ' + title);
+    }
+
+    function handleCloseTab(fileId) {
+      const file = appState.files.find(f => f.id === fileId);
+      if (!file) return;
+
+      if (file.isModified) {
+        showConfirmDialog(
+          'Close Tab?',
+          `"${file.title}" has unsaved changes. Are you sure you want to close it?`,
+          () => executeCloseTab(fileId)
+        );
+      } else {
+        executeCloseTab(fileId);
+      }
+    }
+
+    function executeCloseTab(fileId) {
+      const index = appState.files.findIndex(f => f.id === fileId);
+      if (index === -1) return;
+
+      appState.files.splice(index, 1);
+
+      // If no files left, create an empty one
+      if (appState.files.length === 0) {
+        const fallback = createFile('Diagram 1.mmd', TEMPLATES.flowchart);
+        appState.files.push(fallback);
+        appState.activeFileId = fallback.id;
+      } else if (appState.activeFileId === fileId) {
+        // Switch to adjacent tab
+        const nextActive = appState.files[Math.max(0, index - 1)];
+        appState.activeFileId = nextActive.id;
+      }
+
+      const activeFile = getActiveFile();
+      codeEditorEl.value = activeFile ? activeFile.code : '';
+      updateLineNumbers();
+      renderTabs();
+      triggerRender();
+      saveToStorage();
+    }
+
+    // --- Tab Rename ---
+    let pendingRenameId = null;
+    function promptRenameTab(fileId) {
+      const file = appState.files.find(f => f.id === fileId);
+      if (!file) return;
+      pendingRenameId = fileId;
+      const renameInput = document.getElementById('rename-input');
+      renameInput.value = file.title;
+      document.getElementById('rename-modal').classList.remove('hidden');
+      setTimeout(() => renameInput.focus(), 50);
+    }
+
+    function saveRename() {
+      const renameInput = document.getElementById('rename-input');
+      const newTitle = renameInput.value.trim();
+      if (newTitle && pendingRenameId) {
+        const file = appState.files.find(f => f.id === pendingRenameId);
+        if (file) {
+          file.title = newTitle;
+          renderTabs();
+          saveToStorage();
+        }
+      }
+      document.getElementById('rename-modal').classList.add('hidden');
+      pendingRenameId = null;
+    }
+
+    // --- Editor Helpers: Line numbers & cursor tracking ---
+    function updateLineNumbers() {
+      const lines = codeEditorEl.value.split('\n').length;
+      let numbersHtml = '';
+      for (let i = 1; i <= lines; i++) {
+        numbersHtml += `<div class="line-number">${i}</div>`;
+      }
+      lineNumbersEl.innerHTML = numbersHtml;
+    }
+
+    function updateCursorInfo() {
+      const pos = codeEditorEl.selectionStart;
+      const text = codeEditorEl.value.substring(0, pos);
+      const lines = text.split('\n');
+      const currentLine = lines.length;
+      const currentCol = lines[lines.length - 1].length + 1;
+      charLineInfoEl.textContent = `Ln ${currentLine}, Col ${currentCol}`;
+    }
+
+    // Sync scroll between textarea and line numbers column
+    codeEditorEl.addEventListener('scroll', () => {
+      lineNumbersEl.scrollTop = codeEditorEl.scrollTop;
+    });
+
+    // --- Diagram Rendering Engine ---
+    function triggerRender() {
+      clearTimeout(renderDebounceTimer);
+      renderDebounceTimer = setTimeout(renderCurrentDiagram, 250);
+    }
+
+    async function renderCurrentDiagram() {
+      const code = codeEditorEl.value.trim();
+      if (!code) {
+        mermaidOutputEl.innerHTML = '<div class="text-slate-500 text-xs italic">Diagram is empty. Type some code or select a template.</div>';
+        hideErrorBanner();
+        return;
+      }
+
+      const renderId = 'diagram_' + Date.now();
+
+      try {
+        // Validate / Parse Mermaid syntax before rendering
+        const valid = await mermaid.parse(code);
+        if (valid || valid === undefined) {
+          // Valid syntax: clear error state
+          hideErrorBanner();
+          const { svg } = await mermaid.render(renderId, code);
+          mermaidOutputEl.innerHTML = svg;
+          
+          // Make sure rendered SVG scales smoothly with viewport
+          const svgEl = mermaidOutputEl.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.maxWidth = '100%';
+            svgEl.style.height = 'auto';
+            svgEl.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        // Display syntax error without breaking the user experience
+        console.warn("Mermaid Parse Error:", err);
+        showErrorBanner(err.message || String(err));
+      }
+    }
+
+    function showErrorBanner(msg) {
+      // Clean up technical Mermaid error stack noise if present
+      let cleanMsg = msg.replace(/^Error:\s*/, '').split('\n')[0];
+      errorMessageEl.textContent = cleanMsg;
+      errorBannerEl.classList.remove('hidden');
+    }
+
+    function hideErrorBanner() {
+      errorBannerEl.classList.add('hidden');
+    }
+
+    // --- Interactive Viewer: Zoom & Pan Implementation ---
+    function updateTransform() {
+      renderViewportEl.style.transform = `translate(${zoomState.translateX}px, ${zoomState.translateY}px) scale(${zoomState.scale})`;
+      zoomBadgeEl.textContent = `${Math.round(zoomState.scale * 100)}%`;
+    }
+
+    function zoomBy(factor) {
+      const newScale = Math.min(Math.max(0.15, zoomState.scale * factor), 5);
+      zoomState.scale = newScale;
+      updateTransform();
+    }
+
+    function resetZoom() {
+      zoomState.scale = 1;
+      zoomState.translateX = 0;
+      zoomState.translateY = 0;
+      updateTransform();
+    }
+
+    function fitToScreen() {
+      const svg = mermaidOutputEl.querySelector('svg');
+      if (!svg) {
+        resetZoom();
+        return;
+      }
+
+      const containerRect = canvasContainerEl.getBoundingClientRect();
+      const svgRect = svg.getBoundingClientRect();
+
+      // Current unscaled width / height
+      const unscaledWidth = svgRect.width / zoomState.scale;
+      const unscaledHeight = svgRect.height / zoomState.scale;
+
+      const padding = 80;
+      const scaleX = (containerRect.width - padding) / unscaledWidth;
+      const scaleY = (containerRect.height - padding) / unscaledHeight;
+      const fitScale = Math.min(scaleX, scaleY, 1.5);
+
+      zoomState.scale = Math.max(0.2, fitScale);
+      zoomState.translateX = 0;
+      zoomState.translateY = 0;
+      updateTransform();
+    }
+
+    // Canvas Pan (Mouse Drag)
+    canvasContainerEl.addEventListener('mousedown', (e) => {
+      // Ignore click on interactive buttons or text
+      if (e.target.closest('button')) return;
+      zoomState.isDragging = true;
+      zoomState.startX = e.clientX - zoomState.translateX;
+      zoomState.startY = e.clientY - zoomState.translateY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!zoomState.isDragging) return;
+      zoomState.translateX = e.clientX - zoomState.startX;
+      zoomState.translateY = e.clientY - zoomState.startY;
+      updateTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      zoomState.isDragging = false;
+    });
+
+    // Canvas Zoom (Wheel)
+    canvasContainerEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      zoomBy(zoomFactor);
+    }, { passive: false });
+
+    // Touch support for Pan and Pinch-Zoom
+    let initialPinchDist = null;
+    canvasContainerEl.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        zoomState.isDragging = true;
+        zoomState.startX = e.touches[0].clientX - zoomState.translateX;
+        zoomState.startY = e.touches[0].clientY - zoomState.translateY;
+      } else if (e.touches.length === 2) {
+        zoomState.isDragging = false;
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    canvasContainerEl.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && zoomState.isDragging) {
+        zoomState.translateX = e.touches[0].clientX - zoomState.startX;
+        zoomState.translateY = e.touches[0].clientY - zoomState.startY;
+        updateTransform();
+      } else if (e.touches.length === 2 && initialPinchDist) {
+        const currentDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = currentDist / initialPinchDist;
+        if (factor > 1.05 || factor < 0.95) {
+          zoomBy(factor > 1 ? 1.03 : 0.97);
+          initialPinchDist = currentDist;
+        }
+      }
+    }, { passive: true });
+
+    canvasContainerEl.addEventListener('touchend', () => {
+      zoomState.isDragging = false;
+      initialPinchDist = null;
+    });
+
+    // --- Split Pane Resize Functionality ---
+    const dragGutter = document.getElementById('drag-gutter');
+    const editorPane = document.getElementById('editor-pane');
+    const splitContainer = document.getElementById('split-container');
+    let isResizing = false;
+
+    dragGutter.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      dragGutter.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const containerRect = splitContainer.getBoundingClientRect();
+      const offset = e.clientX - containerRect.left;
+      const minWidth = 260;
+      const maxWidth = containerRect.width - 260;
+      if (offset >= minWidth && offset <= maxWidth) {
+        const percentage = (offset / containerRect.width) * 100;
+        editorPane.style.width = percentage + '%';
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        dragGutter.classList.remove('dragging');
+        document.body.style.cursor = 'default';
+      }
+    });
+
+    // --- File Drag & Drop ---
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleIncomingFiles(e.dataTransfer.files);
+      }
+    });
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleIncomingFiles(e.target.files);
+        e.target.value = ''; // Reset input
+      }
+    });
+
+    function handleIncomingFiles(fileList) {
+      Array.from(fileList).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target.result;
+          createNewTab(file.name, content);
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    // --- Export Utilities ---
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportSourceCode() {
+      const file = getActiveFile();
+      const blob = new Blob([codeEditorEl.value], { type: 'text/plain;charset=utf-8' });
+      const name = file.title.endsWith('.mmd') || file.title.endsWith('.txt') ? file.title : file.title + '.mmd';
+      downloadBlob(blob, name);
+      showToast('Exported ' + name);
+    }
+
+    function exportSVG() {
+      const svg = mermaidOutputEl.querySelector('svg');
+      if (!svg) {
+        showToast('⚠️ No diagram to export');
+        return;
+      }
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const file = getActiveFile();
+      const baseName = file.title.replace(/\.[^/.]+$/, "");
+      downloadBlob(blob, `${baseName}.svg`);
+      showToast('Exported SVG successfully');
+    }
+
+    function exportPNG(transparent = false) {
+      const svg = mermaidOutputEl.querySelector('svg');
+      if (!svg) {
+        showToast('⚠️ No diagram to export');
+        return;
+      }
+
+      // Clone SVG and prepare dimensions
+      const clonedSvg = svg.cloneNode(true);
+      const bbox = svg.getBoundingClientRect();
+      const width = Math.max(bbox.width, 600) * 2; // 2x scale for high resolution
+      const height = Math.max(bbox.height, 400) * 2;
+
+      clonedSvg.setAttribute('width', width);
+      clonedSvg.setAttribute('height', height);
+
+      const svgData = new XMLSerializer().serializeToString(clonedSvg);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      // Draw background if not transparent
+      if (!transparent) {
+        ctx.fillStyle = appState.theme === 'dark' ? '#0f172a' : '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => {
+          const file = getActiveFile();
+          const baseName = file.title.replace(/\.[^/.]+$/, "");
+          const suffix = transparent ? '-transparent.png' : '.png';
+          downloadBlob(blob, `${baseName}${suffix}`);
+          showToast('Exported PNG successfully');
+        }, 'image/png');
+      };
+      img.src = url;
+    }
+
+    // --- Clipboard Copy Helper ---
+    function copyTextToClipboard(text, msg) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast(msg);
+      } catch (err) {
+        showToast('⚠️ Copy failed');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // --- Toast / Confirm Modals ---
+    let toastTimeout = null;
+    function showToast(message, icon = '✅') {
+      const toastEl = document.getElementById('toast');
+      document.getElementById('toast-text').textContent = message;
+      document.getElementById('toast-icon').textContent = icon;
+      toastEl.classList.remove('opacity-0', 'translate-y-[-20px]');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toastEl.classList.add('opacity-0', 'translate-y-[-20px]');
+      }, 2400);
+    }
+
+    let confirmCallback = null;
+    function showConfirmDialog(title, message, onConfirm) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = message;
+      confirmCallback = onConfirm;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function escapeHtml(string) {
+      return String(string)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // --- Event Listeners Initialization ---
+    function setupEventListeners() {
+      const exportDropdown = document.getElementById('export-dropdown');
+      // Code Editor input listener
+      codeEditorEl.addEventListener('input', () => {
+        const file = getActiveFile();
+        if (file) {
+          file.code = codeEditorEl.value;
+          file.isModified = true;
+          renderTabs();
+          saveToStorage();
+        }
+        updateLineNumbers();
+        updateCursorInfo();
+        triggerRender();
+      });
+
+      // Cursor position tracker
+      codeEditorEl.addEventListener('keyup', updateCursorInfo);
+      codeEditorEl.addEventListener('click', updateCursorInfo);
+
+      // Support Tab key indentation inside textarea
+      codeEditorEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = codeEditorEl.selectionStart;
+          const end = codeEditorEl.selectionEnd;
+          codeEditorEl.value = codeEditorEl.value.substring(0, start) + '  ' + codeEditorEl.value.substring(end);
+          codeEditorEl.selectionStart = codeEditorEl.selectionEnd = start + 2;
+          codeEditorEl.dispatchEvent(new Event('input'));
+        }
+      });
+
+      // Header button actions
+      document.getElementById('btn-new').addEventListener('click', () => {
+        const tabNumber = appState.files.length + 1;
+        createNewTab(`Diagram ${tabNumber}.mmd`, TEMPLATES.flowchart);
+      });
+
+      document.getElementById('btn-add-tab').addEventListener('click', () => {
+        const tabNumber = appState.files.length + 1;
+        createNewTab(`Diagram ${tabNumber}.mmd`, TEMPLATES.flowchart);
+      });
+
+      // Template gallery triggers
+      document.getElementById('btn-templates-menu').addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportDropdown.classList.add('hidden');
+        openTemplateGallery();
+      });
+      document.getElementById('btn-editor-templates').addEventListener('click', openTemplateGallery);
+
+      // Export dropdown toggle
+      const exportMenuBtn = document.getElementById('btn-export-menu');
+      exportMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportDropdown.classList.toggle('hidden');
+      });
+
+      // Close dropdowns on outside click
+      window.addEventListener('click', () => {
+        exportDropdown.classList.add('hidden');
+      });
+
+      // Export actions
+      document.getElementById('btn-export-mmd').addEventListener('click', exportSourceCode);
+      document.getElementById('btn-export-svg').addEventListener('click', exportSVG);
+      document.getElementById('btn-export-png').addEventListener('click', () => exportPNG(false));
+      document.getElementById('btn-export-png-trans').addEventListener('click', () => exportPNG(true));
+
+      document.getElementById('btn-copy-code').addEventListener('click', () => {
+        copyTextToClipboard(codeEditorEl.value, 'Copied Mermaid code to clipboard');
+      });
+
+      document.getElementById('btn-copy-svg').addEventListener('click', () => {
+        const svg = mermaidOutputEl.querySelector('svg');
+        if (svg) {
+          copyTextToClipboard(svg.outerHTML, 'Copied SVG markup to clipboard');
+        } else {
+          showToast('⚠️ No rendered SVG available');
+        }
+      });
+
+      // Zoom Controls
+      document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1.2));
+      document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(0.8));
+      document.getElementById('btn-zoom-reset').addEventListener('click', resetZoom);
+      document.getElementById('btn-zoom-fit').addEventListener('click', fitToScreen);
+
+      // Clean / Format button
+      document.getElementById('btn-format').addEventListener('click', () => {
+        const lines = codeEditorEl.value.split('\n').map(l => l.trimEnd());
+        codeEditorEl.value = lines.join('\n');
+        codeEditorEl.dispatchEvent(new Event('input'));
+        showToast('Formatted lines');
+      });
+
+      // Clear button
+      document.getElementById('btn-clear').addEventListener('click', () => {
+        codeEditorEl.value = '';
+        codeEditorEl.dispatchEvent(new Event('input'));
+      });
+
+      // Dismiss syntax error banner
+      document.getElementById('btn-dismiss-error').addEventListener('click', hideErrorBanner);
+
+      // Rename Modal Actions
+      document.getElementById('btn-rename-cancel').addEventListener('click', () => {
+        document.getElementById('rename-modal').classList.add('hidden');
+      });
+      document.getElementById('btn-rename-save').addEventListener('click', saveRename);
+      document.getElementById('rename-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveRename();
+        if (e.key === 'Escape') document.getElementById('rename-modal').classList.add('hidden');
+      });
+
+      // Confirm Modal Actions
+      document.getElementById('btn-confirm-cancel').addEventListener('click', () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        confirmCallback = null;
+      });
+      document.getElementById('btn-confirm-ok').addEventListener('click', () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        if (confirmCallback) confirmCallback();
+        confirmCallback = null;
+      });
+
+      // Theme toggle action
+      document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+        const nextTheme = appState.theme === 'dark' ? 'light' : 'dark';
+        applyTheme(nextTheme);
+      });
+
+      // Global keyboard shortcuts (Ctrl+S to mark saved, Ctrl+N new tab)
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          const file = getActiveFile();
+          if (file) {
+            file.isModified = false;
+            renderTabs();
+            saveToStorage();
+            showToast('Saved to browser storage');
+          }
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't' && !e.shiftKey) {
+          e.preventDefault();
+          openTemplateGallery();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+          e.preventDefault();
+          const tabNumber = appState.files.length + 1;
+          createNewTab(`Diagram ${tabNumber}.mmd`, TEMPLATES.flowchart);
+        }
+      });
+    }
+
+
+    // --- Template Gallery ---
+    const thumbCache = new Map();   // key: theme + num -> svg markup
+    let tplMode = 'new';            // 'new' | 'replace'
+    let tplFilter = 'all';
+    let digitBuffer = '';
+    let digitTimer = null;
+    let thumbRunId = 0;
+
+    const MODE_KEY = 'MERMAID_STUDIO_TEMPLATE_MODE';
+    try { const m = localStorage.getItem(MODE_KEY); if (m === 'new' || m === 'replace') tplMode = m; } catch (e) {}
+
+    function isGalleryOpen() {
+      return !document.getElementById('template-modal').classList.contains('hidden');
+    }
+
+    function updateModeButtons() {
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        const active = btn.dataset.mode === tplMode;
+        btn.className = 'mode-btn px-2.5 py-1 rounded-md font-medium transition ' +
+          (active ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white');
+      });
+    }
+
+    function renderTemplateFilters() {
+      const wrap = document.getElementById('template-filters');
+      const chips = [{ key: 'all', label: 'All', icon: '' }].concat(TEMPLATE_GROUPS);
+      wrap.innerHTML = '';
+      chips.forEach(g => {
+        const b = document.createElement('button');
+        const active = tplFilter === g.key;
+        b.className = 'flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition ' +
+          (active ? 'bg-blue-600 border-blue-500 text-white'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-600');
+        b.textContent = (g.icon ? g.icon + ' ' : '') + g.label;
+        b.addEventListener('click', () => { tplFilter = g.key; renderTemplateFilters(); renderTemplateGallery(); });
+        wrap.appendChild(b);
+      });
+    }
+
+    function renderTemplateGallery() {
+      const gallery = document.getElementById('template-gallery');
+      gallery.innerHTML = '';
+      TEMPLATE_GROUPS.forEach(group => {
+        if (tplFilter !== 'all' && tplFilter !== group.key) return;
+        const items = TEMPLATE_LIST.filter(t => t.group === group.key);
+        if (!items.length) return;
+        const first = items[0].num, last = items[items.length - 1].num;
+        const range = first === last ? `${first}` : `${first}\u2013${last}`;
+
+        const section = document.createElement('section');
+        section.innerHTML = `
+          <div class="flex items-baseline gap-2 mb-2.5">
+            <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-slate-800 text-blue-300">${range}</span>
+            <h4 class="text-sm font-semibold text-white">${group.icon} ${escapeHtml(group.label)}</h4>
+            <span class="text-xs text-slate-400">${escapeHtml(group.purpose)}</span>
+          </div>
+          <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"></div>`;
+        const grid = section.querySelector('.grid');
+
+        items.forEach(t => {
+          const card = document.createElement('button');
+          card.className = 'tpl-card group text-left rounded-lg border border-slate-800 bg-slate-950/60 hover:border-blue-500 hover:bg-slate-900 focus:outline-none focus:border-blue-500 transition overflow-hidden flex flex-col';
+          card.dataset.num = t.num;
+          card.innerHTML = `
+            <div class="thumb h-36 bg-slate-950 border-b border-slate-800 flex items-center justify-center p-2 overflow-hidden text-[10px] text-slate-500" data-thumb="${t.num}">Loading preview\u2026</div>
+            <div class="p-3 flex items-start gap-2.5">
+              <span class="flex-shrink-0 w-6 h-6 rounded-md bg-blue-600/20 text-blue-300 text-xs font-semibold flex items-center justify-center">${t.num}</span>
+              <div class="min-w-0 flex-1">
+                <div class="text-xs font-semibold text-slate-100 group-hover:text-white">${escapeHtml(t.title)}</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(t.desc)}</div>
+              </div>
+              <span class="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition flex-shrink-0 mt-1">Use \u2192</span>
+            </div>`;
+          card.addEventListener('click', () => applyTemplate(t.num));
+          grid.appendChild(card);
+        });
+        gallery.appendChild(section);
+      });
+      renderGalleryThumbnails();
+    }
+
+    async function renderGalleryThumbnails() {
+      const runId = ++thumbRunId;
+      const slots = Array.from(document.querySelectorAll('#template-gallery [data-thumb]'));
+      for (const slot of slots) {
+        if (runId !== thumbRunId || !isGalleryOpen()) return;
+        const num = Number(slot.dataset.thumb);
+        const cacheKey = appState.theme + '_' + num;
+        let svgMarkup = thumbCache.get(cacheKey);
+        if (!svgMarkup) {
+          const tpl = TEMPLATE_LIST.find(t => t.num === num);
+          try {
+            const { svg } = await mermaid.render('thumb_' + num + '_' + Date.now(), tpl.code);
+            svgMarkup = svg;
+            thumbCache.set(cacheKey, svgMarkup);
+          } catch (err) {
+            svgMarkup = null;
+          }
+        }
+        if (runId !== thumbRunId) return;
+        if (svgMarkup) {
+          slot.innerHTML = svgMarkup;
+          const el = slot.querySelector('svg');
+          if (el) {
+            el.removeAttribute('height');
+            el.removeAttribute('width');
+            el.style.cssText = 'width:100%;height:100%;max-width:100%;max-height:100%;';
+            el.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          }
+        } else {
+          const tpl = TEMPLATE_LIST.find(t => t.num === num);
+          slot.innerHTML = '<pre class="code-font text-[9px] leading-tight text-slate-400 text-left w-full h-full overflow-hidden whitespace-pre"></pre>';
+          slot.firstChild.textContent = tpl.code;
+        }
+      }
+    }
+
+    function openTemplateGallery() {
+      document.getElementById('template-modal').classList.remove('hidden');
+      updateModeButtons();
+      renderTemplateFilters();
+      renderTemplateGallery();
+      digitBuffer = '';
+    }
+
+    function closeTemplateGallery() {
+      document.getElementById('template-modal').classList.add('hidden');
+      thumbRunId++;
+      digitBuffer = '';
+      clearTimeout(digitTimer);
+    }
+
+    function applyTemplate(num) {
+      const tpl = TEMPLATE_LIST.find(t => t.num === num);
+      if (!tpl) return;
+      closeTemplateGallery();
+
+      if (tplMode === 'replace') {
+        const file = getActiveFile();
+        if (file) {
+          file.code = tpl.code;
+          codeEditorEl.value = tpl.code;
+          file.isModified = true;
+          renderTabs();
+          updateLineNumbers();
+          updateCursorInfo();
+          triggerRender();
+          saveToStorage();
+          showToast(`Loaded template ${tpl.num}: ${tpl.title}`);
+        }
+      } else {
+        createNewTab(`${tpl.title}.mmd`, tpl.code);
+        showToast(`Opened template ${tpl.num}: ${tpl.title}`);
+      }
+      resetZoom();
+      setTimeout(fitToScreen, 450);
+      codeEditorEl.focus();
+    }
+
+    function setupTemplateGallery() {
+      document.getElementById('btn-template-close').addEventListener('click', closeTemplateGallery);
+      document.getElementById('template-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'template-modal') closeTemplateGallery();
+      });
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          tplMode = btn.dataset.mode;
+          try { localStorage.setItem(MODE_KEY, tplMode); } catch (e) {}
+          updateModeButtons();
+        });
+      });
+
+      // Keyboard: Esc closes, typing a number picks a template
+      window.addEventListener('keydown', (e) => {
+        if (!isGalleryOpen()) return;
+        if (e.key === 'Escape') { closeTemplateGallery(); return; }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          digitBuffer += e.key;
+          clearTimeout(digitTimer);
+          const n = Number(digitBuffer);
+          const maxNum = TEMPLATE_LIST.length;
+          const exists = TEMPLATE_LIST.some(t => t.num === n);
+          const couldExtend = n >= 1 && n * 10 <= maxNum;
+          if (exists && !couldExtend) {
+            digitBuffer = '';
+            applyTemplate(n);
+          } else if (digitBuffer.length >= 2 || n === 0) {
+            digitBuffer = '';
+          } else {
+            digitTimer = setTimeout(() => {
+              const m = Number(digitBuffer);
+              digitBuffer = '';
+              if (TEMPLATE_LIST.some(t => t.num === m)) applyTemplate(m);
+            }, 650);
+          }
+        }
+      });
+    }
+
+    // --- Application Bootloader ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromStorage();
+      applyTheme(appState.theme);
+      renderTabs();
+
+      const activeFile = getActiveFile();
+      if (activeFile) {
+        codeEditorEl.value = activeFile.code;
+      }
+
+      updateLineNumbers();
+      updateCursorInfo();
+      setupEventListeners();
+      setupTemplateGallery();
+      triggerRender();
+    });
+  </script>
+</body>
+</html>

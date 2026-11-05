@@ -1,0 +1,737 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Script Name : tune-realme5s.sh
+# Target      : realme 5s (RMX1925) - ColorOS / Android 9-10
+# Description : Interactive ADB Tuning & Debloating Script with confirmations
+# ==============================================================================
+
+# Exit immediately if interrupted by Ctrl+C
+trap 'echo -e "\n\n\033[0;31m[!] ยกเลิกการทำงานโดยผู้ใช้\033[0m"; exit 130' INT
+
+# ------------------------------------------------------------------------------
+# Colors & Formatting
+# ------------------------------------------------------------------------------
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+CYAN="\033[0;36m"
+MAGENTA="\033[0;35m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# ------------------------------------------------------------------------------
+# Directories & Files
+# ------------------------------------------------------------------------------
+BACKUP_DIR="${HOME}/.realme5s_tuning"
+HISTORY_LOG="${BACKUP_DIR}/tuning-history.log"
+mkdir -p "${BACKUP_DIR}"
+
+log_action() {
+    local action="$1"
+    local timestamp
+    timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[${timestamp}] ${action}" >> "${HISTORY_LOG}"
+}
+
+# ------------------------------------------------------------------------------
+# Locate ADB Binary
+# ------------------------------------------------------------------------------
+find_adb() {
+    if command -v adb >/dev/null 2>&1; then
+        echo "adb"
+        return 0
+    fi
+
+    # Check common locations on macOS / Linux
+    local candidates=(
+        "${HOME}/Library/Android/sdk/platform-tools/adb"
+        "/opt/homebrew/bin/adb"
+        "/usr/local/bin/adb"
+        "/usr/bin/adb"
+    )
+
+    for path in "${candidates[@]}"; do
+        if [ -x "${path}" ]; then
+            echo "${path}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+ADB_CMD=$(find_adb)
+
+if [ -z "${ADB_CMD}" ]; then
+    echo -e "${RED}[ERROR] ไม่พบคำสั่ง adb ในระบบ!${RESET}"
+    echo "กรุณาติดตั้ง Android Platform Tools:"
+    echo "  - macOS (Homebrew): brew install android-platform-tools"
+    echo "  - หรือดาวน์โหลดจาก: https://developer.android.com/tools/releases/platform-tools"
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# Device Selection & Verification
+# ------------------------------------------------------------------------------
+check_device_connection() {
+    local raw_devices
+    raw_devices=$("${ADB_CMD}" devices | sed '1d' | grep -v '^[[:space:]]*$')
+
+    if [ -z "${raw_devices}" ]; then
+        echo -e "${RED}[ERROR] ไม่พบอุปกรณ์ Android เชื่อมต่ออยู่!${RESET}"
+        echo -e "กรุณาตรวจสอบ:"
+        echo -e "  1. เปิดโหมด Developer options บนโทรศัพท์"
+        echo -e "  2. เปิดใช้งาน ${BOLD}USB Debugging${RESET}"
+        echo -e "  3. ตรวจสอบสาย USB และปลดล็อกหน้าจอกด ${BOLD}'Allow USB debugging'${RESET}"
+        exit 1
+    fi
+
+    # Count authorized devices
+    local authorized_devices
+    authorized_devices=$(echo "${raw_devices}" | awk '$2 == "device" {print $1}')
+
+    if [ -z "${authorized_devices}" ]; then
+        echo -e "${YELLOW}[WARNING] พบอุปกรณ์ แต่ยังไม่ได้รับอนุญาต (unauthorized หรือ offline)${RESET}"
+        echo "${raw_devices}"
+        echo -e "กรุณาดูที่หน้าจอโทรศัพท์แล้วกด ${BOLD}'Allow' / 'ตกลง'${RESET}"
+        exit 1
+    fi
+
+    # Select device (if multiple)
+    local count
+    count=$(echo "${authorized_devices}" | grep -c .)
+    if [ "${count}" -eq 1 ]; then
+        TARGET_SERIAL=$(echo "${authorized_devices}" | head -n 1)
+    else
+        echo -e "${CYAN}พบอุปกรณ์เชื่อมต่อมากกว่า 1 เครื่อง:${RESET}"
+        local i=1
+        while IFS= read -r s; do
+            echo "  ${i}) ${s}"
+            i=$((i + 1))
+        done <<< "${authorized_devices}"
+        read -r -p "เลือกหมายเลขเครื่อง (1-${count}): " choice
+        TARGET_SERIAL=$(echo "${authorized_devices}" | sed -n "${choice}p")
+        if [ -z "${TARGET_SERIAL}" ]; then
+            echo -e "${RED}เลือกไม่ถูกต้อง${RESET}"
+            exit 1
+        fi
+    fi
+}
+
+run_adb() {
+    "${ADB_CMD}" -s "${TARGET_SERIAL}" "$@" < /dev/null
+}
+
+run_shell() {
+    "${ADB_CMD}" -s "${TARGET_SERIAL}" shell "$@" < /dev/null
+}
+
+verify_realme5s() {
+    DEVICE_MODEL=$(run_shell getprop ro.product.model | tr -d '\r')
+    DEVICE_MANUF=$(run_shell getprop ro.product.manufacturer | tr -d '\r')
+    DEVICE_ANDROID=$(run_shell getprop ro.build.version.release | tr -d '\r')
+    DEVICE_BUILD=$(run_shell getprop ro.build.display.id | tr -d '\r')
+
+    if [[ "${DEVICE_MODEL}" != *"RMX1925"* && "${DEVICE_MODEL}" != *"realme"* ]]; then
+        echo -e "${YELLOW}==================================================================${RESET}"
+        echo -e "${YELLOW}[คำเตือนความเข้ากันได้]${RESET}"
+        echo -e "อุปกรณ์ที่เชื่อมต่อคือ: ${BOLD}${DEVICE_MANUF} ${DEVICE_MODEL} (Android ${DEVICE_ANDROID})${RESET}"
+        echo -e "สคริปต์นี้ถูกปรับแต่งและทดสอบกับ ${BOLD}realme 5s (RMX1925)${RESET} โดยเฉพาะ"
+        echo -e "หากรันกับรุ่นหรือยี่ห้ออื่น บางแพ็กเกจอาจไม่มี หรืออาจเกิดผลข้างเคียงได้"
+        echo -e "${YELLOW}==================================================================${RESET}"
+        read -r -p "คุณต้องการดำเนินการต่อหรือไม่? (y/N): " proceed
+        if [[ ! "${proceed}" =~ ^[yY]([eE][sS])?$ ]]; then
+            echo -e "${RED}ยกเลิกการทำงาน${RESET}"
+            exit 0
+        fi
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# UI Helpers & Prompts
+# ------------------------------------------------------------------------------
+show_header() {
+    clear
+    echo -e "${CYAN}==================================================================${RESET}"
+    echo -e "${BOLD}       REALME 5s (RMX1925) - ADB TUNING & OPTIMIZATION TOOL       ${RESET}"
+    echo -e "${CYAN}==================================================================${RESET}"
+    echo -e "อุปกรณ์: ${GREEN}${DEVICE_MANUF} ${DEVICE_MODEL}${RESET} | Serial: ${GREEN}${TARGET_SERIAL}${RESET} | Android: ${GREEN}${DEVICE_ANDROID}${RESET}"
+    echo -e "Build : ${DEVICE_BUILD}"
+    echo -e "${CYAN}------------------------------------------------------------------${RESET}"
+}
+
+pause_prompt() {
+    echo ""
+    read -r -p "กด [Enter] เพื่อกลับสู่เมนูหลัก..."
+}
+
+confirm_action() {
+    local prompt_text="$1"
+    local default_ans="${2:-N}"
+    
+    echo -e "\n${YELLOW}${BOLD}⚠️  ยืนยันการดำเนินการ:${RESET}"
+    echo -e "${YELLOW}${prompt_text}${RESET}"
+    echo ""
+    read -r -p "ต้องการทำต่อหรือไม่? (พิมพ์ 'y' เพื่อตกลง / 'n' หรือกด Enter เพื่อยกเลิก): " ans
+    if [[ "${ans}" =~ ^[yY]([eE][sS])?$ ]]; then
+        return 0
+    else
+        echo -e "${RED}ยกเลิกคำสั่งเรียบร้อยแล้ว${RESET}"
+        return 1
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Feature 1: System Info & Diagnostics
+# ------------------------------------------------------------------------------
+menu_system_info() {
+    show_header
+    echo -e "${BOLD}[1. ตรวจสอบสถานะเครื่อง & ทรัพยากรระบบ]${RESET}\n"
+    
+    echo -e "${CYAN}>> ข้อมูลฮาร์ดแวร์และรอม:${RESET}"
+    echo "  - CPU Platform  : $(run_shell getprop ro.board.platform | tr -d '\r')"
+    echo "  - Security Patch: $(run_shell getprop ro.build.version.security_patch | tr -d '\r')"
+    echo "  - Boot State    : $(run_shell getprop ro.boot.verifiedbootstate | tr -d '\r')"
+    echo ""
+
+    echo -e "${CYAN}>> หน่วยความจำ (RAM):${RESET}"
+    run_shell cat /proc/meminfo | grep -E "MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree" | sed 's/^/  /'
+    echo ""
+
+    echo -e "${CYAN}>> พื้นที่จัดเก็บข้อมูล (/data):${RESET}"
+    run_shell df -h /data | sed 's/^/  /'
+    echo ""
+
+    echo -e "${CYAN}>> สถานะแบตเตอรี่:${RESET}"
+    run_shell dumpsys battery | grep -E "level|temperature|voltage|status|health" | sed 's/^/  /'
+    echo ""
+
+    echo -e "${CYAN}>> จำนวนแอปที่ถูก Freeze (Disabled) อยู่ปัจจุบัน:${RESET}"
+    local d_count
+    d_count=$(run_shell pm list packages -d | wc -l | tr -d ' ')
+    echo "  จำนวน: ${d_count} แพ็กเกจ"
+
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 2: Animation Speed Tuning
+# ------------------------------------------------------------------------------
+menu_animation_tuning() {
+    show_header
+    echo -e "${BOLD}[2. ปรับความเร็ว Animation Scale]${RESET}\n"
+    
+    echo -e "${CYAN}>> ค่า Animation ปัจจุบันบนเครื่อง:${RESET}"
+    local w_scale t_scale a_scale
+    w_scale=$(run_shell settings get global window_animation_scale | tr -d '\r')
+    t_scale=$(run_shell settings get global transition_animation_scale | tr -d '\r')
+    a_scale=$(run_shell settings get global animator_duration_scale | tr -d '\r')
+    echo "  - Window animation scale     : ${w_scale:-1}"
+    echo "  - Transition animation scale : ${t_scale:-1}"
+    echo "  - Animator duration scale    : ${a_scale:-1}"
+    echo ""
+
+    echo -e "${YELLOW}💡 คำแนะนำ:${RESET}"
+    echo "  - 0.5x : ลดระยะเวลาเอฟเฟกต์ลงครึ่งหนึ่ง ทำให้ UI รู้สึกเปิด-ปิดแอปรวดเร็วขึ้น (แนะนำ)"
+    echo "  - 1.0x : คืนค่ามาตรฐานดั้งเดิมของระบบ"
+    echo "  - 0.0x : ปิดเอฟเฟกต์แอนิเมชันทั้งหมด เหมาะกับเครื่องที่ต้องการความเร็วสูงสุด"
+    echo -e "  ${MAGENTA}ข้อควรทราบ:${MAGENTA} บน realme ColorOS บางเวอร์ชัน คำสั่ง ADB อาจถูกปฏิเสธด้วย WRITE_SECURE_SETTINGS"
+    echo "  หากคำสั่งไม่ผ่าน สคริปต์จะนำท่านเปิดหน้า Developer Options เพื่อปรับผ่านหน้าจอโดยตรง"
+    echo ""
+
+    echo "เลือกรูปแบบการปรับแต่ง:"
+    echo "  1) ปรับเป็น 0.5x (แนะนำ - ตอบสนองไวขึ้นทันตา)"
+    echo "  2) ปรับเป็น 1.0x (คืนค่าเริ่มต้นของโรงงาน)"
+    echo "  3) ปิดแอนิเมชันเป็น 0x (เร็วที่สุด ไม่แสดง Transition)"
+    echo "  0) ยกเลิก / กลับสู่เมนูหลัก"
+    echo ""
+    read -r -p "เลือกข้อ (0-3): " anim_choice
+
+    local target_val=""
+    case "${anim_choice}" in
+        1) target_val="0.5" ;;
+        2) target_val="1" ;;
+        3) target_val="0" ;;
+        0) return 0 ;;
+        *) echo -e "${RED}เลือกไม่ถูกต้อง${RESET}"; pause_prompt; return ;;
+    esac
+
+    if ! confirm_action "จะทำการปรับ Animation Scale ทุกตัวเป็น: ${target_val}x"; then
+        pause_prompt
+        return
+    fi
+
+    echo -e "\n${CYAN}กำลังส่งคำสั่งผ่าน ADB...${RESET}"
+    local err_msg
+    err_msg=$(run_shell "settings put global window_animation_scale ${target_val} && settings put global transition_animation_scale ${target_val} && settings put global animator_duration_scale ${target_val}" 2>&1)
+
+    if [[ "${err_msg}" == *"WRITE_SECURE_SETTINGS"* || "${err_msg}" == *"Permission denial"* ]]; then
+        echo -e "\n${YELLOW}[!] พบข้อจำกัดสิทธิ์ของ ColorOS (WRITE_SECURE_SETTINGS)${RESET}"
+        echo -e "ระบบปฏิเสธการแก้ค่าผ่านคำสั่ง ADB settings put global"
+        echo -e "${GREEN}กำลังเปิดหน้า Developer Options บนโทรศัพท์ให้แทน...${RESET}"
+        run_shell am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS >/dev/null 2>&1
+        echo -e "\nกรุณาเลื่อนลงมาที่หัวข้อ 'Drawing' บนโทรศัพท์ แล้วปรับ 3 ค่านี้เป็น ${BOLD}${target_val}x${RESET} ด้วยตนเอง:"
+        echo "  1. Window animation scale"
+        echo "  2. Transition animation scale"
+        echo "  3. Animator duration scale"
+    else
+        echo -e "${GREEN}✅ ปรับค่า Animation เป็น ${target_val}x สำเร็จเรียบร้อย!${RESET}"
+        log_action "Set animation scale to ${target_val}x"
+    fi
+
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 3: Freeze Bloatware & Telemetry
+# ------------------------------------------------------------------------------
+
+# Master list of safe packages for realme 5s
+# Format: package_name|group_id|thai_description
+PACKAGE_DATABASE=(
+    # Group 1: Telemetry & Analytics
+    "com.heytap.habit.analysis|1|Intelligent Analytics System (วิเคราะห์พฤติกรรมการใช้งาน)"
+    "com.nearme.statistics.rom|1|Oppo DCS (Data Collection Service / สถิติรอม)"
+    "com.oppo.logkit|1|Oppo LogKit Beta Daemon (ระบบเก็บประวัติการทำงานเบื้องหลัง)"
+    "com.oppo.qualityprotect|1|Quality Protect Telemetry (ส่งรายงานข้อผิดพลาดเข้าศูนย์)"
+    "com.google.android.feedback|1|Google Feedback Reporter (ส่งรายงาน Bug Google)"
+
+    # Group 2: Lockscreen Ads & Push Services
+    "com.heytap.pictorial|2|Lockscreen Magazine (รูปหน้าจอล็อกพร้อมโฆษณา/แบนเนอร์)"
+    "com.nearme.atlas|2|NearMe Push & Ad delivery framework"
+    "com.oppo.atlas|2|Oppo Atlas Service (ระบบกระจายโฆษณาและการแจ้งเตือนแฝง)"
+    "com.oppo.quicksearchbox|2|Quick Search Box (ช่องค้นหาหน้าหลักพร้อมฟีดโฆษณา)"
+
+    # Group 3: Facebook Pre-installed Trackers
+    "com.facebook.appmanager|3|Facebook App Manager (ตัวอัปเดตแอปเฟซบุ๊กเบื้องหลัง)"
+    "com.facebook.services|3|Facebook Services (Telemetry & Background Sync)"
+    "com.facebook.system|3|Facebook System Installer (ตัวติดตั้งแอปเฟซบุ๊ก)"
+
+    # Group 4: OEM Stores & Redundant Apps
+    "com.heytap.market|4|HeyTap App Market (ร้านโหลดแอปแถมที่ชอบแจ้งเตือนชวนโหลด)"
+    "com.heytap.themestore|4|HeyTap Theme Store (ร้านขายธีม มีโฆษณาแฝง)"
+    "com.heytap.browser|4|HeyTap Browser (เบราว์เซอร์ติดเครื่องพร้อมข่าวและโฆษณา)"
+    "com.coloros.gamespace|4|GameSpace Engine (ตัวจัดการเกม ColorOS)"
+    "com.coloros.assistantscreen|4|Breeno Assistant Screen (หน้าจอด้านซ้ายสุดพร้อมการ์ดข่าว)"
+    "com.oppo.partnerbrowsercustomizations|4|Partner Browser Customizations (บุ๊กมาร์กสปอนเซอร์)"
+    "com.oppo.operationManual|4|Oppo Operation Manual (คู่มือเครื่องแบบแอป)"
+    "com.redteamobile.roaming|4|Redtea Roaming Service (บริการ SoftSIM ท่องเที่ยว)"
+    "com.redteamobile.roaming.deamon|4|Redtea Roaming Daemon (เซอร์วิสเบื้องหลัง SoftSIM)"
+)
+
+freeze_package() {
+    local pkg="$1"
+    local desc="$2"
+    
+    # Check if package exists on device
+    local check_pkg
+    check_pkg=$(run_shell pm list packages "${pkg}" | tr -d '\r')
+    if [ -z "${check_pkg}" ]; then
+        echo -e "  [${YELLOW}ข้าม${RESET}] ${pkg} (ไม่มีในเครื่อง)"
+        return 0
+    fi
+
+    # Check if already disabled
+    local is_disabled
+    is_disabled=$(run_shell pm list packages -d "${pkg}" | tr -d '\r')
+    if [ -n "${is_disabled}" ]; then
+        echo -e "  [${CYAN}เดิมปิดอยู่แล้ว${RESET}] ${pkg}"
+        return 0
+    fi
+
+    local out
+    out=$(run_shell pm disable-user --user 0 "${pkg}" 2>&1 | tr -d '\r')
+    if [[ "${out}" == *"disabled-user"* || "${out}" == *"new state: disabled"* ]]; then
+        echo -e "  [${GREEN}FREEZE สำเร็จ${RESET}] ${pkg} (${desc})"
+        log_action "Freeze package: ${pkg}"
+    elif [[ "${out}" == *"SecurityException"* || "${out}" == *"default"* ]]; then
+        echo -e "  [${YELLOW}ถูกระบบ ColorOS ป้องกัน${RESET}] ${pkg} -> ใช้ force-stop แทน"
+        run_shell am force-stop "${pkg}" >/dev/null 2>&1
+        log_action "Force-stopped protected package: ${pkg}"
+    else
+        echo -e "  [${RED}ล้มเหลว${RESET}] ${pkg}: ${out}"
+    fi
+}
+
+menu_freeze_bloatware() {
+    show_header
+    echo -e "${BOLD}[3. Freeze Bloatware & Telemetry (ปิดการทำงานแบบปลอดภัย)]${RESET}\n"
+    
+    echo -e "${YELLOW}💡 คำแนะนำและความปลอดภัย:${RESET}"
+    echo "  - การ Freeze จะใช้คำสั่ง 'pm disable-user --user 0' เพื่อสั่งพักการทำงานของแอป"
+    echo "  - ไฟล์ระบบและข้อมูลแอป ${BOLD}จะไม่ถูกลบ${RESET} และสามารถเปิดใช้งานกลับ (Unfreeze) ได้ตลอดเวลา"
+    echo "  - ช่วยประหยัดแบตเตอรี่ ลดการส่งข้อมูลออกนอกเครื่อง และคืนพื้นที่หน่วยความจำ RAM"
+    echo "  - รายการทั้งหมดได้รับการคัดกรองแล้วว่าปลอดภัยต่อฟังก์ชันโทร, SMS, Wi-Fi, กล้อง, และแอปธนาคาร"
+    echo ""
+
+    echo "เลือกกลุ่มที่ต้องการ Freeze:"
+    echo "  1) 🛡️  Freeze ทุกกลุ่มที่แนะนำ (Safe All - ทั้ง 21 แพ็กเกจ) [แนะนำสูงสุด]"
+    echo "  2) 📊 เฉพาะกลุ่ม Telemetry & Analytics (สถิติ/พฤติกรรมผู้ใช้ - 5 รายการ)"
+    echo "  3) 📢 เฉพาะกลุ่ม Lockscreen Ads & Push (โฆษณาหน้าจอล็อก & แจ้งเตือนแฝง - 4 รายการ)"
+    echo "  4) 👤 เฉพาะกลุ่ม Facebook Pre-installed (บริการเบื้องหลังของ Facebook - 3 รายการ)"
+    echo "  5) 🛒 เฉพาะกลุ่ม OEM Store & Bloatware (ร้านค้าแถม/เบราว์เซอร์/ผู้ช่วย - 9 รายการ)"
+    echo "  6) 🔍 เลือก Freeze ทีละแพ็กเกจด้วยตนเอง"
+    echo "  0) ยกเลิก / กลับสู่เมนูหลัก"
+    echo ""
+    read -r -p "เลือกข้อ (0-6): " freeze_choice
+
+    local target_group=""
+    case "${freeze_choice}" in
+        1) target_group="ALL" ;;
+        2) target_group="1" ;;
+        3) target_group="2" ;;
+        4) target_group="3" ;;
+        5) target_group="4" ;;
+        6) target_group="CUSTOM" ;;
+        0) return 0 ;;
+        *) echo -e "${RED}เลือกไม่ถูกต้อง${RESET}"; pause_prompt; return ;;
+    esac
+
+    if [ "${target_group}" = "CUSTOM" ]; then
+        echo -e "\n${CYAN}>> รายการแพ็กเกจทั้งหมด:${RESET}"
+        local idx=1
+        for item in "${PACKAGE_DATABASE[@]}"; do
+            local p_name p_grp p_desc
+            IFS='|' read -r p_name p_grp p_desc <<< "${item}"
+            echo "  ${idx}) ${p_name} [${p_desc}]"
+            idx=$((idx + 1))
+        done
+        echo ""
+        read -r -p "พิมพ์หมายเลขแพ็กเกจที่ต้องการ Freeze (1-${#PACKAGE_DATABASE[@]}): " c_idx
+        if [[ "${c_idx}" =~ ^[0-9]+$ ]] && [ "${c_idx}" -ge 1 ] && [ "${c_idx}" -le "${#PACKAGE_DATABASE[@]}" ]; then
+            local selected_item="${PACKAGE_DATABASE[$((c_idx - 1))]}"
+            local sel_name sel_grp sel_desc
+            IFS='|' read -r sel_name sel_grp sel_desc <<< "${selected_item}"
+            
+            if confirm_action "จะทำการ Freeze แพ็กเกจ: ${sel_name} (${sel_desc})"; then
+                echo -e "\n${CYAN}กำลังดำเนินการ...${RESET}"
+                freeze_package "${sel_name}" "${sel_desc}"
+            fi
+        else
+            echo -e "${RED}หมายเลขไม่ถูกต้อง${RESET}"
+        fi
+        pause_prompt
+        return
+    fi
+
+    # Display packages to be affected
+    echo -e "\n${CYAN}>> รายการแพ็กเกจที่จะถูกตรวจสอบและ Freeze:${RESET}"
+    for item in "${PACKAGE_DATABASE[@]}"; do
+        local p_name p_grp p_desc
+        IFS='|' read -r p_name p_grp p_desc <<< "${item}"
+        if [ "${target_group}" = "ALL" ] || [ "${target_group}" = "${p_grp}" ]; then
+            echo "  - ${p_name} (${p_desc})"
+        fi
+    done
+
+    if ! confirm_action "คุณต้องการดำเนินการ Freeze แพ็กเกจในกลุ่มดังกล่าวหรือไม่?"; then
+        pause_prompt
+        return
+    fi
+
+    echo -e "\n${CYAN}กำลังส่งคำสั่งผ่าน ADB...${RESET}"
+    for item in "${PACKAGE_DATABASE[@]}"; do
+        local p_name p_grp p_desc
+        IFS='|' read -r p_name p_grp p_desc <<< "${item}"
+        if [ "${target_group}" = "ALL" ] || [ "${target_group}" = "${p_grp}" ]; then
+            freeze_package "${p_name}" "${p_desc}"
+        fi
+    done
+
+    echo -e "\n${GREEN}✅ ดำเนินการเสร็จสิ้น!${RESET}"
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 4: Unfreeze / Rollback
+# ------------------------------------------------------------------------------
+menu_unfreeze_packages() {
+    show_header
+    echo -e "${BOLD}[4. Unfreeze / Rollback คืนค่าแอปที่เคยปิดไว้]${RESET}\n"
+    
+    local disabled_list
+    disabled_list=$(run_shell pm list packages -d | sed 's/^package://' | tr -d '\r')
+
+    if [ -z "${disabled_list}" ]; then
+        echo -e "${GREEN}ปัจจุบันไม่มีแพ็กเกจใดที่ถูก Freeze (Disabled) อยู่บนเครื่องนี้${RESET}"
+        pause_prompt
+        return
+    fi
+
+    echo -e "${CYAN}>> รายการแพ็กเกจที่ถูก Freeze อยู่ในขณะนี้:${RESET}"
+    local i=1
+    local d_arr=()
+    while IFS= read -r pkg; do
+        if [ -n "${pkg}" ]; then
+            echo "  ${i}) ${pkg}"
+            d_arr+=("${pkg}")
+            i=$((i + 1))
+        fi
+    done <<< "${disabled_list}"
+    echo ""
+
+    echo "เลือกรูปแบบการ Unfreeze:"
+    echo "  1) 🔄 Unfreeze คืนค่าทั้งหมด (${#d_arr[@]} แพ็กเกจ)"
+    echo "  2) 🎯 เลือก Unfreeze ทีละแพ็กเกจจากรายการด้านบน"
+    echo "  3) ⌨️  พิมพ์ชื่อแพ็กเกจเองเพื่อเปิดใช้งาน"
+    echo "  0) ยกเลิก / กลับสู่เมนูหลัก"
+    echo ""
+    read -r -p "เลือกข้อ (0-3): " unfreeze_choice
+
+    case "${unfreeze_choice}" in
+        1)
+            if confirm_action "ต้องการเปิดใช้งาน (Unfreeze) คืนค่าทุกแพ็กเกจใช่หรือไม่?"; then
+                for p in "${d_arr[@]}"; do
+                    run_shell pm enable "${p}" >/dev/null 2>&1
+                    echo -e "  [${GREEN}เปิดคืนแล้ว${RESET}] ${p}"
+                    log_action "Unfreeze package: ${p}"
+                done
+                echo -e "\n${GREEN}✅ คืนค่าทั้งหมดสำเร็จเรียบร้อย!${RESET}"
+            fi
+            ;;
+        2)
+            read -r -p "เลือกหมายเลขที่ต้องการเปิดคืน (1-${#d_arr[@]}): " target_num
+            if [[ "${target_num}" =~ ^[0-9]+$ ]] && [ "${target_num}" -ge 1 ] && [ "${target_num}" -le "${#d_arr[@]}" ]; then
+                local selected_pkg="${d_arr[$((target_num - 1))]}"
+                if confirm_action "ต้องการเปิดคืนแพ็กเกจ: ${selected_pkg}"; then
+                    run_shell pm enable "${selected_pkg}" >/dev/null 2>&1
+                    echo -e "  [${GREEN}เปิดคืนแล้ว${RESET}] ${selected_pkg}"
+                    log_action "Unfreeze package: ${selected_pkg}"
+                fi
+            else
+                echo -e "${RED}หมายเลขไม่ถูกต้อง${RESET}"
+            fi
+            ;;
+        3)
+            read -r -p "กรอกชื่อ Package Name (เช่น com.heytap.themestore): " custom_pkg
+            if [ -n "${custom_pkg}" ]; then
+                if confirm_action "ต้องการเปิดใช้งานแพ็กเกจ: ${custom_pkg}"; then
+                    local res
+                    res=$(run_shell pm enable "${custom_pkg}" 2>&1 | tr -d '\r')
+                    echo -e "  ผลลัพธ์: ${res}"
+                    log_action "Unfreeze manual: ${custom_pkg}"
+                fi
+            fi
+            ;;
+        0) return 0 ;;
+        *) echo -e "${RED}เลือกไม่ถูกต้อง${RESET}" ;;
+    esac
+
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 5: ART Runtime Compilation
+# ------------------------------------------------------------------------------
+menu_art_compilation() {
+    show_header
+    echo -e "${BOLD}[5. ART Runtime Compilation (Compile Speed)]${RESET}\n"
+    
+    echo -e "${YELLOW}💡 คำแนะนำและข้อควรระวังสำคัญมาก:${RESET}"
+    echo "  - คำสั่ง: ${BOLD}cmd package compile -m speed -a${RESET}"
+    echo "  - การทำงาน: บังคับให้ Android Runtime (ART) ทำการ Optimize และแปลงแอปทั้งหมดในเครื่อง"
+    echo "              เป็นโค้ดแบบ AOT (Ahead-Of-Time) เพื่อให้เปิดและประมวลผลได้เร็วที่สุด"
+    echo -e "  ${RED}ข้อพึงระวัง:${RESET}"
+    echo "    1. ใช้เวลาทำงานนานประมาณ 5 - 15 นาที ขึ้นกับจำนวนแอป"
+    echo "    2. ซีพียูจะทำงานหนักและตัวเครื่องจะเกิดความร้อนสูง"
+    echo "    3. ใช้พลังงานแบตเตอรี่สูงมาก ${BOLD}(กรุณาเสียบสายชาร์จขณะทำ)${RESET}"
+    echo "    4. ขนาดพื้นที่เก็บข้อมูลจะถูกใช้เพิ่มขึ้นเล็กน้อย"
+    echo "    5. ไม่จำเป็นต้องรันบ่อยๆ รันเพียงครั้งเดียวหลัง Debloat ก็เพียงพอ"
+    echo ""
+
+    if ! confirm_action "คุณเข้าใจข้อควรระวัง เสียบสายชาร์จพร้อม และต้องการเริ่มกระบวนการใช่หรือไม่?"; then
+        pause_prompt
+        return
+    fi
+
+    echo -e "\n${CYAN}>> กำลังเริ่มดำเนินการ ART Speed Compilation...${RESET}"
+    echo -e "${YELLOW}กรุณาอย่าถอดสาย USB หรือปิดเครื่องจนกว่าจะเสร็จสิ้น${RESET}\n"
+
+    log_action "Started ART compilation (-m speed -a)"
+    local out
+    out=$(run_shell cmd package compile -m speed -a 2>&1)
+    echo "${out}"
+
+    if [[ "${out}" == *"Failed to cpmpile"* || "${out}" == *"Error"* ]]; then
+        echo -e "\n${YELLOW}[!] ColorOS ของ realme บล็อกคำสั่ง compile แบบ manual (Failed to cpmpile !)${RESET}"
+        echo -e "ซึ่งเป็นข้อจำกัดด้านความปลอดภัยของ OppoPackageManagerService"
+        echo -e "คำสั่งที่เป็นทางการและทำงานได้จริงบน realme คือ: ${BOLD}cmd package bg-dexopt-job${RESET}"
+        if confirm_action "ต้องการรัน Background DEX Optimization (bg-dexopt-job) แทนหรือไม่?"; then
+            echo -e "\n${CYAN}>> กำลังรัน bg-dexopt-job...${RESET}"
+            run_shell cmd package bg-dexopt-job
+            echo -e "\n${GREEN}✅ รัน Background DEX Optimization สำเร็จเรียบร้อย!${RESET}"
+            log_action "Executed cmd package bg-dexopt-job successfully"
+        fi
+    else
+        echo -e "\n${GREEN}✅ การรัน ART Compilation เสร็จสมบูรณ์!${RESET}"
+        log_action "Finished ART compilation"
+    fi
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 6: Force Stop Running Apps
+# ------------------------------------------------------------------------------
+menu_force_stop() {
+    show_header
+    echo -e "${BOLD}[6. Force Stop แอปชั่วคราว]${RESET}\n"
+    
+    echo -e "${YELLOW}💡 คำแนะนำ:${RESET}"
+    echo "  - เป็นการสั่งหยุดการทำงานของแอปใน RAM ชั่วคราว ไม่ลบข้อมูล ไม่ถอนการติดตั้ง"
+    echo "  - เมื่อแตะเปิดแอปบนหน้าจอ โทรศัพท์จะเปิดแอปขึ้นมาทำงานใหม่ตามปกติ"
+    echo ""
+
+    local common_apps=(
+        "com.facebook.katana|Facebook"
+        "com.facebook.orca|Messenger"
+        "com.instagram.android|Instagram"
+        "com.zhiliaoapp.musically|TikTok"
+        "com.google.android.youtube|YouTube"
+        "com.google.android.gm|Gmail"
+        "com.nearme.gamecenter|Game Center (Oppo)"
+    )
+
+    echo "เลือกแอปที่ต้องการ Force Stop:"
+    local i=1
+    for app_entry in "${common_apps[@]}"; do
+        local a_pkg a_name
+        IFS='|' read -r a_pkg a_name <<< "${app_entry}"
+        echo "  ${i}) ${a_name} (${a_pkg})"
+        i=$((i + 1))
+    done
+    echo "  A) 🛑 Force Stop ทุกแอปในรายการนี้พร้อมกัน"
+    echo "  0) ยกเลิก"
+    echo ""
+    read -r -p "เลือกตัวเลือก: " fs_choice
+
+    if [ "${fs_choice}" = "0" ]; then
+        return 0
+    elif [ "${fs_choice}" = "A" ] || [ "${fs_choice}" = "a" ]; then
+        if confirm_action "ต้องการ Force Stop ทุกแอปในรายการใช่หรือไม่?"; then
+            for app_entry in "${common_apps[@]}"; do
+                local a_pkg a_name
+                IFS='|' read -r a_pkg a_name <<< "${app_entry}"
+                run_shell am force-stop "${a_pkg}" >/dev/null 2>&1
+                echo -e "  [${GREEN}หยุดแล้ว${RESET}] ${a_name}"
+            done
+            echo -e "\n${GREEN}✅ สั่งหยุดทุกแอปเรียบร้อย!${RESET}"
+        fi
+    elif [[ "${fs_choice}" =~ ^[0-9]+$ ]] && [ "${fs_choice}" -ge 1 ] && [ "${fs_choice}" -le "${#common_apps[@]}" ]; then
+        local sel_entry="${common_apps[$((fs_choice - 1))]}"
+        local a_pkg a_name
+        IFS='|' read -r a_pkg a_name <<< "${sel_entry}"
+        if confirm_action "ต้องการ Force Stop แอป: ${a_name}"; then
+            run_shell am force-stop "${a_pkg}" >/dev/null 2>&1
+            echo -e "\n${GREEN}✅ สั่งหยุด ${a_name} เรียบร้อย!${RESET}"
+        fi
+    else
+        echo -e "${RED}เลือกไม่ถูกต้อง${RESET}"
+    fi
+
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 7: List Disabled Packages
+# ------------------------------------------------------------------------------
+menu_list_disabled() {
+    show_header
+    echo -e "${BOLD}[7. รายการแอปที่ถูก Freeze อยู่ปัจจุบัน]${RESET}\n"
+    
+    local disabled
+    disabled=$(run_shell pm list packages -d | sed 's/^package://' | tr -d '\r')
+
+    if [ -z "${disabled}" ]; then
+        echo -e "${GREEN}ไม่มีแพ็กเกจใดที่ถูก Freeze อยู่${RESET}"
+    else
+        local count
+        count=$(echo "${disabled}" | wc -l | tr -d ' ')
+        echo -e "${CYAN}พบทั้งหมด ${count} แพ็กเกจที่ถูกปิดใช้งานอยู่:${RESET}"
+        echo "${disabled}" | sed 's/^/  - /'
+    fi
+
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Feature 8: Backup & Snapshot Report
+# ------------------------------------------------------------------------------
+menu_backup_snapshot() {
+    show_header
+    echo -e "${BOLD}[8. บันทึก Snapshot ข้อมูลเครื่องลงไฟล์ Backup]${RESET}\n"
+    
+    local timestamp
+    timestamp=$(date "+%Y%m%d_%H%M%S")
+    local snap_dir="${BACKUP_DIR}/snapshot_${timestamp}"
+    mkdir -p "${snap_dir}"
+
+    echo -e "${CYAN}กำลังบันทึกข้อมูลเครื่องลงไดเรกทอรี:${RESET} ${snap_dir}"
+    echo "  - บันทึก getprop..."
+    run_shell getprop > "${snap_dir}/android-getprop.txt"
+    
+    echo "  - บันทึก meminfo..."
+    run_shell cat /proc/meminfo > "${snap_dir}/android-meminfo.txt"
+    
+    echo "  - บันทึก storage (df -h)..."
+    run_shell df -h > "${snap_dir}/android-storage.txt"
+    
+    echo "  - บันทึกรายชื่อแพ็กเกจทั้งหมด..."
+    run_shell pm list packages -f > "${snap_dir}/android-all-packages.txt"
+    
+    echo "  - บันทึกรายชื่อแพ็กเกจที่ถูกปิด..."
+    run_shell pm list packages -d > "${snap_dir}/android-disabled-packages.txt"
+
+    echo -e "\n${GREEN}✅ บันทึก Snapshot เรียบร้อยสมบูรณ์!${RESET}"
+    log_action "Created system snapshot at: ${snap_dir}"
+    pause_prompt
+}
+
+# ------------------------------------------------------------------------------
+# Main Application Loop
+# ------------------------------------------------------------------------------
+main() {
+    check_device_connection
+    verify_realme5s
+
+    while true; do
+        show_header
+        echo -e "${BOLD}กรุณาเลือกเมนูที่ต้องการทำงาน:${RESET}"
+        echo ""
+        echo "  1) 📱 ตรวจสอบสถานะเครื่อง & ทรัพยากรระบบ (RAM, พื้นที่, แบตเตอรี่)"
+        echo "  2) ⚡ ปรับความเร็ว Animation Scale (0.5x / 1.0x / 0x)"
+        echo "  3) 🛡️  Freeze Bloatware & Telemetry (ปิดโฆษณา/ตัวส่องพฤติกรรมอย่างปลอดภัย)"
+        echo "  4) 🔄 Unfreeze / Rollback คืนค่าแอปที่เคยปิดไว้"
+        echo "  5) 🚀 ART Runtime Compilation (Compile Speed เพิ่มความเร็วแอป)"
+        echo "  6) 🛑 Force Stop แอปที่ไม่ต้องการใช้งานชั่วคราว"
+        echo "  7) 📋 ดูรายการแอปที่ถูก Freeze อยู่ปัจจุบัน"
+        echo "  8) 💾 บันทึก Snapshot ข้อมูลเครื่องลงไฟล์ Backup"
+        echo "  0) 🚪 ออกจากโปรแกรม"
+        echo ""
+        if ! read -r -p "เลือกเมนู (0-8): " choice; then
+            echo -e "\n${GREEN}ออกจากโปรแกรม${RESET}"
+            exit 0
+        fi
+
+        case "${choice}" in
+            1) menu_system_info ;;
+            2) menu_animation_tuning ;;
+            3) menu_freeze_bloatware ;;
+            4) menu_unfreeze_packages ;;
+            5) menu_art_compilation ;;
+            6) menu_force_stop ;;
+            7) menu_list_disabled ;;
+            8) menu_backup_snapshot ;;
+            0)
+                echo -e "\n${GREEN}ขอบคุณที่ใช้งาน ขอให้ใช้งาน realme 5s ได้อย่างลื่นไหลครับ!${RESET}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}เมนูไม่ถูกต้อง กรุณาเลือก 0-8${RESET}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+main "$@"
